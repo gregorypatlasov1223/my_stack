@@ -31,8 +31,8 @@ typedef int type_of_element;
 struct stack_t
 {
     type_of_element *array;
-    type_of_element capacity;
-    type_of_element size;
+    size_t capacity;
+    size_t size;
 };
 
 
@@ -42,6 +42,7 @@ stack_err_t stack_creator(stack_t *stack, size_t capacity);
 stack_err_t stack_verify(stack_t *stack, const char *file_name, const char *function_name, int line);
 
 void stack_destructor(stack_t *stack);
+void error_translator(stack_err_t type_of_error);
 void stack_dump(stack_t *stack, stack_err_t type_of_error, const char *file_name, const char *function_name, int line);
 
 
@@ -261,10 +262,14 @@ void stack_dump(stack_t *stack, stack_err_t type_of_error, const char *file_name
     size_t capacity_of_stack = stack -> capacity;
     size_t size_of_stack = stack -> size;
 
-    printf("There are %d errors int Stack_dump. It was called from function %s at %s line %d\n", type_of_error, function_name, file_name, line);
+    printf("The type of error is ");
+    error_translator(type_of_error);
+    printf("ZALUPA BLYAT\n");
 
-    printf("size = %lu\n", size_of_stack);
-    printf("capacity = %lu\n", capacity_of_stack);
+    printf("It was called from function %s at %s line %d\n", type_of_error, function_name, file_name, line);
+
+    printf("size = %zu\n", size_of_stack);
+    printf("capacity = %zu\n", capacity_of_stack);
     printf("array[%p]\n", stack -> array);
 
     for (int index = 0; index < size_of_stack; index++)
@@ -273,9 +278,27 @@ void stack_dump(stack_t *stack, stack_err_t type_of_error, const char *file_name
     //for (int index = 0; index >= (size_of_stack) && (index < capacity_of_stack); index++)
     //    printf("[%d] = %d (POISON)\n", index, stack -> array[index]);
     for (int index = stack->size; index < stack->capacity; index++)
-        printf("  [%d] = %d (FREE)\n", index, stack->array[index]);
+        printf("  [%d] = %d (POISON)\n", index, stack->array[index]);
 }
 
-
-
+void error_translator(stack_err_t type_of_error)
+{
+    switch(type_of_error) {
+        case ARRAY_POINTER_ERROR:
+            printf("ARRAY_POINTER_ERROR\n");
+            break;
+        case UNDER_FLOW:
+            printf("UNDER_FLOW\n");
+            break;
+        case OVER_FLOW:
+            printf("OVER_FLOW\n");
+            break;
+        case NO_ERROR:
+            printf("NO_ERROR\n");
+            break;
+        default:
+            printf("UNKNOWN_ERROR (%d)\n", type_of_error);
+            break;
+    }
+}
 
