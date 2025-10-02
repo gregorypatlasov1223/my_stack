@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#define STACK_MAX_CAPACITY 333
-#define STACK_MAX_SIZE  100
+
 #define RESET_CAPACITY 0
 #define RESET_SIZE 0
 #define INITIAL_SIZE 0
 #define MULTIPLIER 2
+#define STACK_MAX_CAPACITY 333
+#define STACK_MAX_SIZE  100
+#define POISON 765911
 
 /*#define CHECK_STACK code_error = stack_verify(stack, __FILE__, __func__, __LINE__); \
                     if (code_error) \
@@ -19,11 +21,12 @@ enum stack_err_t
 {
     INITIALIZE_ERROR    = 0,
     NO_ERROR            = 1,
-    UNDER_FLOW          = 3,
-    OVER_FLOW           = 4,
+    UNDER_FLOW_CAPACITY = 2,
+    OVER_FLOW_CAPACITY  = 3,
+    UNDER_FLOW_SIZE     = 4,
+    OVER_FLOW_SIZE      = 5,
     ARRAY_POINTER_ERROR = 13,
-    SIZE_ERROR          = 52,
-    CAPACITY_ERROR      = 666
+    STACK_POINTER_ERROR = 52,
 };
 
 typedef int type_of_element;
@@ -38,43 +41,39 @@ struct stack_t
 
 stack_err_t stack_pop(stack_t *stack, type_of_element *value);
 stack_err_t stack_push(stack_t *stack, type_of_element value);
-stack_err_t stack_creator(stack_t *stack, size_t capacity);
+stack_err_t stack_constructor(stack_t *stack, size_t capacity);
 stack_err_t stack_verify(stack_t *stack, const char *file_name, const char *function_name, int line);
 
 void stack_destructor(stack_t *stack);
-void error_translator(stack_err_t type_of_error);
-void stack_dump(stack_t *stack, stack_err_t type_of_error, const char *file_name, const char *function_name, int line);
+void error_translator(stack_err_t code_error);
+void stack_dump(stack_t *stack, stack_err_t code_error, const char *file_name, const char *function_name, int line);
 
 
 int main(void)
 {
     stack_t my_stack = {0};
 
-    if (stack_creator(&my_stack, 5) != NO_ERROR)
+    if (stack_constructor(&my_stack, 50) != NO_ERROR)
     {
         fprintf(stderr, "Failed to initialize stack\n");
         return INITIALIZE_ERROR;
     }
 
-    my_stack.size = 1000;  // OVER_FLOW error
-    //my_stack.size = -1;    // UNDER_FLOW error
+    // my_stack.size = 350;
+    // my_stack.capacity = 340;  // OVER_FLOW_CAPACITY error
+    //my_stack.size = -1;    // UNDER_FLOW_CAPACITY error
 
+    //stack_constructor(&my_stack, my_stack.capacity);
 
     if (stack_push(&my_stack, 10) != NO_ERROR)
-    {
         printf("Push failed\n");
-    }
     if (stack_push(&my_stack, 20) != NO_ERROR)
-    {
         printf("Push failed\n");
-    }
     if (stack_push(&my_stack, 30) != NO_ERROR)
-    {
         printf("Push failed\n");
-    }
 
-    type_of_element value = 0;
-
+     type_of_element value = 0;
+//
     if (stack_pop(&my_stack, &value) == NO_ERROR)
         printf("Popped value = %d\n", value);
     if (stack_pop(&my_stack, &value) == NO_ERROR)
@@ -82,8 +81,7 @@ int main(void)
     if (stack_pop(&my_stack, &value) == NO_ERROR)
         printf("Popped value = %d\n", value);
 
-    if (stack_pop(&my_stack, &value) != NO_ERROR)
-        printf("Stack pop failed with error (this should show stack_dump)\n");
+    stack_dump(&my_stack, NO_ERROR, __FILE__, __func__, __LINE__);
 
     stack_destructor(&my_stack);
 
@@ -91,41 +89,37 @@ int main(void)
 }
 
 
-/*stack_err_t stack_pop(stack_t *stack, type_of_element *value)
-{
-    if (stack == NULL || value == NULL)
-    {
-        return ARRAY_POINTER_ERROR;
-    }
-
-    if ((stack -> size) < 0)
-    {
-        fprintf(stderr, "Error: Stack is underflowed\n");
-        return stack_verify(stack, __FILE__, __func__, __LINE__);
-    }
-
-    *value = stack -> array[(stack -> size) - 1];
-    stack -> size = (stack -> size) - 1;
-
-    return NO_ERROR;
-}*/
-
-
 stack_err_t stack_pop(stack_t *stack, type_of_element *value)
 {
-    if (stack == NULL || value == NULL) {
-        return ARRAY_POINTER_ERROR;
-    }
+    assert(value != NULL);
 
     stack_err_t code_error = stack_verify(stack, __FILE__, __func__, __LINE__);
-    if (code_error != NO_ERROR) {
+
+    if (code_error != NO_ERROR)
+    {
+        if (code_error == OVER_FLOW_CAPACITY || code_error == OVER_FLOW_SIZE)
+        {
+            printf("Error: Stack is overflowed. Pop is failed\n");
+            return code_error;
+        }
+        else
+        {
+            stack_dump(stack, code_error, __FILE__, __func__, __LINE__);
+            return code_error;
+        }
+    }
+
+    if (code_error != NO_ERROR)
+    {
+        stack_dump(stack, code_error, __FILE__, __func__, __LINE__);
         return code_error;
     }
 
+
     if ((stack -> size) <= 0)
     {
-        fprintf(stderr, "Error: Stack is underflowed\n");
-        return UNDER_FLOW;
+        fprintf(stderr, "Error: Stack is underflowed\n"); // может тут сделать другую реализацию?
+        return UNDER_FLOW_SIZE;
     }
 
     *value = stack -> array[(stack -> size) - 1];
@@ -140,36 +134,62 @@ stack_err_t stack_push(stack_t *stack, type_of_element value)
     stack_err_t code_error = stack_verify(stack, __FILE__, __func__, __LINE__);
 
     if (code_error != NO_ERROR)
-        return code_error;
-
-    if (stack -> size == stack -> capacity) //>=
     {
-        (stack -> capacity) *= MULTIPLIER;
-        stack -> array = (type_of_element*)realloc(stack -> array, (stack -> capacity) * sizeof(type_of_element));
-
-        if ((stack -> array) == NULL)
-            return ARRAY_POINTER_ERROR;
+        if (code_error == OVER_FLOW_CAPACITY || code_error == OVER_FLOW_SIZE)
+        {
+            printf("Error: Stack is overflowed\n");
+            return code_error;
+        }
+        else
+        {
+            stack_dump(stack, code_error, __FILE__, __func__, __LINE__);
+            return code_error;
+        }
     }
+
+    if (stack -> size >= stack -> capacity)
+    {
+        size_t new_capacity = (stack -> capacity) * MULTIPLIER;
+
+        type_of_element *new_array = (type_of_element*)realloc(stack -> array, new_capacity * sizeof(type_of_element));
+        stack -> array = new_array;
+        printf("555\n");
+
+        for (size_t index = stack -> capacity; index < new_capacity; index++) // проинициализоровал выделенные элементы Poison но оно все равно не выводит как надо
+        {
+            stack -> array[index] = POISON;
+            printf("%d", stack -> array[index]);
+        }
+
+    }
+
+    if ((stack -> array) == NULL)
+        return ARRAY_POINTER_ERROR; // на нужном месте стоит?
 
     stack -> size = (stack -> size) + 1;
     stack -> array[(stack -> size) - 1] = value;
+
 
     return NO_ERROR;
 }
 
 
-stack_err_t stack_creator(stack_t *stack, size_t initial_capacity)
+stack_err_t stack_constructor(stack_t *stack, size_t initial_capacity)
 {
     if (stack == NULL)
-        return ARRAY_POINTER_ERROR;
+        return STACK_POINTER_ERROR;
 
     stack -> array = (type_of_element*)calloc(initial_capacity, sizeof(type_of_element));
 
-    if (stack->array == NULL)
+    if (stack -> array == NULL)
         return ARRAY_POINTER_ERROR;
 
-    stack -> size = INITIAL_SIZE;
     stack -> capacity = initial_capacity;
+
+    for (size_t index = 0; index < stack -> capacity; index++)
+        stack -> array[index] = POISON;
+
+    stack -> size = INITIAL_SIZE;
 
     return NO_ERROR;
 }
@@ -179,7 +199,8 @@ void stack_destructor(stack_t *stack)
 {
     assert(stack != NULL);
 
-    free(stack -> array);
+    if (stack -> array != NULL)
+        free(stack -> array);
 
     stack -> array = NULL;
     stack -> size = RESET_SIZE;
@@ -189,115 +210,114 @@ void stack_destructor(stack_t *stack)
 
 stack_err_t stack_verify(stack_t *stack, const char *file_name, const char *function_name, int line)
 {
-    stack_err_t type_of_error = NO_ERROR;
+    stack_err_t code_error = NO_ERROR;
     if (stack == NULL)
     {
-        printf("Stack has a null pointer\n");
-        type_of_error = ARRAY_POINTER_ERROR;
+        code_error = STACK_POINTER_ERROR;
 
-        stack_dump(stack, type_of_error, file_name, function_name, line);
-        return type_of_error;
+        return code_error;
     }
 
     if ((stack -> array) == NULL)
     {
-        printf("Array has a null pointer\n");
-        type_of_error = ARRAY_POINTER_ERROR;
+        code_error = ARRAY_POINTER_ERROR;
 
-        stack_dump(stack, type_of_error, file_name, function_name, line);
-        return type_of_error;
+        return code_error;
     }
 
     if ((stack -> size) > STACK_MAX_SIZE)
     {
-        printf("Size is bigger than MAX value\n");
-        type_of_error = OVER_FLOW;
+        code_error = OVER_FLOW_SIZE;
 
-        stack_dump(stack, type_of_error, file_name, function_name, line);
-        return type_of_error;
+        return code_error;
     }
 
     if ((stack -> capacity) > STACK_MAX_CAPACITY)
     {
-        printf("Capacity is bigger than MAX value\n");
-        type_of_error = OVER_FLOW;
+        code_error = OVER_FLOW_CAPACITY;
 
-        stack_dump(stack, type_of_error, file_name, function_name, line);
-        return type_of_error;
+        return code_error;
     }
 
     if ((stack -> size) > (stack -> capacity))
     {
-        printf("Size is bigger than capacity\n");
-        type_of_error = OVER_FLOW;
+        code_error = OVER_FLOW_CAPACITY;
 
-        stack_dump(stack, type_of_error, file_name, function_name, line);
-        return type_of_error;
+        return code_error;
     }
 
     if ((stack -> size) < RESET_SIZE)
     {
-        printf("Size is less than MIN value\n");
-        type_of_error = UNDER_FLOW;
+        code_error = UNDER_FLOW_SIZE;
 
-        stack_dump(stack, type_of_error, file_name, function_name, line);
-        return type_of_error;
+        return code_error;
     }
 
     if ((stack -> capacity) < RESET_CAPACITY)
     {
-        printf("Capacity is less than MIN value\n");
-        type_of_error = UNDER_FLOW;
+        code_error = UNDER_FLOW_CAPACITY;
 
-        stack_dump(stack, type_of_error, file_name, function_name, line);
-        return type_of_error;
+        return code_error;
     }
 
     return NO_ERROR;
 }
 
 
-void stack_dump(stack_t *stack, stack_err_t type_of_error, const char *file_name, const char *function_name, int line)
+void stack_dump(stack_t *stack, stack_err_t code_error, const char *file_name, const char *function_name, int line)
 {
-    size_t capacity_of_stack = stack -> capacity;
-    size_t size_of_stack = stack -> size;
+    assert(file_name     != NULL);
+    assert(function_name != NULL);
 
+    //printf("------------------------------------------------------------------------------------------------\n"); //для отладки
     printf("The type of error is ");
-    error_translator(type_of_error);
-    printf("ZALUPA BLYAT\n");
+    error_translator(code_error);
 
-    printf("It was called from function %s at %s line %d\n", type_of_error, function_name, file_name, line);
+    printf("It was called from function %s at %s line %d\n", function_name, file_name, line);
 
-    printf("size = %zu\n", size_of_stack);
-    printf("capacity = %zu\n", capacity_of_stack);
+    printf("size = %zu\n", stack -> size);
+    printf("capacity = %zu\n", stack -> capacity);
     printf("array[%p]\n", stack -> array);
 
-    for (int index = 0; index < size_of_stack; index++)
-        printf("*[%d] = %d\n", index, stack -> array[index]);
-
-    //for (int index = 0; index >= (size_of_stack) && (index < capacity_of_stack); index++)
-    //    printf("[%d] = %d (POISON)\n", index, stack -> array[index]);
-    for (int index = stack->size; index < stack->capacity; index++)
-        printf("  [%d] = %d (POISON)\n", index, stack->array[index]);
+    if (code_error != ARRAY_POINTER_ERROR)
+    {
+        for (int index = 0; index < stack -> capacity; index++)
+        {
+            if (stack -> array[index] == POISON)
+                printf("*[%zu] = %d [POISON]\n", index, stack -> array[index]);
+            else
+                printf("[%zu] = %d\n", index, stack -> array[index]);
+        }
+    }
 }
 
-void error_translator(stack_err_t type_of_error)
+void error_translator(stack_err_t code_error)
 {
-    switch(type_of_error) {
+    switch(code_error)
+    {
         case ARRAY_POINTER_ERROR:
             printf("ARRAY_POINTER_ERROR\n");
             break;
-        case UNDER_FLOW:
-            printf("UNDER_FLOW\n");
+        case STACK_POINTER_ERROR:
+            printf("ARRAY_POINTER_ERROR\n");
             break;
-        case OVER_FLOW:
-            printf("OVER_FLOW\n");
+        case UNDER_FLOW_CAPACITY:
+            printf("UNDER_FLOW_CAPACITY\n");
+            break;
+        case OVER_FLOW_CAPACITY:
+            printf("OVER_FLOW_CAPACITY\n");
+            break;
+        case UNDER_FLOW_SIZE:
+            printf("UNDER_FLOW_SIZE\n");
+            break;
+        case OVER_FLOW_SIZE:
+            printf("OVER_FLOW_SIZE\n");
             break;
         case NO_ERROR:
             printf("NO_ERROR\n");
             break;
         default:
-            printf("UNKNOWN_ERROR (%d)\n", type_of_error);
+            printf("UNKNOWN_ERROR (%d)\n", code_error);
             break;
     }
 }
