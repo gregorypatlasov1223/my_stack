@@ -11,6 +11,10 @@
 #define STACK_MAX_SIZE  100
 #define POISON 765911
 
+#define CANARY_VALUE 0xDEADBEEF
+#define NUMBER_OF_CANARIES 2
+
+
 /*#define CHECK_STACK code_error = stack_verify(stack, __FILE__, __func__, __LINE__); \
                     if (code_error) \
                     { \
@@ -27,6 +31,7 @@ enum stack_err_t
     OVER_FLOW_SIZE      = 5,
     ARRAY_POINTER_ERROR = 13,
     STACK_POINTER_ERROR = 52,
+    CANARY_DAMAGED      = 77
 };
 
 typedef int type_of_element;
@@ -41,12 +46,16 @@ struct stack_t
 
 stack_err_t stack_pop(stack_t *stack, type_of_element *value);
 stack_err_t stack_push(stack_t *stack, type_of_element value);
-stack_err_t stack_constructor(stack_t *stack, size_t capacity);
-stack_err_t stack_verify(stack_t *stack, const char *file_name, const char *function_name, int line);
-
 void stack_destructor(stack_t *stack);
-void error_translator(stack_err_t code_error);
+stack_err_t stack_constructor(stack_t *stack, size_t requested_capacity);
+stack_err_t stack_verify(stack_t *stack, const char *file_name, const char *function_name, int line);
 void stack_dump(stack_t *stack, stack_err_t code_error, const char *file_name, const char *function_name, int line);
+
+void error_translator(stack_err_t code_error);
+
+stack_err_t check_canaries(const stack_t *stack);
+void setup_canaries(stack_t *stack);
+size_t get_data_capacity(size_t total_capacity);
 
 
 int main(void)
@@ -63,7 +72,8 @@ int main(void)
     // my_stack.capacity = 340;  // OVER_FLOW_CAPACITY error
     //my_stack.size = -1;    // UNDER_FLOW_CAPACITY error
 
-    //stack_constructor(&my_stack, my_stack.capacity);
+    // my_stack.array[0] = 0x12345678;  // Повредит переднюю канарейку
+    // stack_verify(&my_stack, __FILE__, __func__, __LINE__);
 
     if (stack_push(&my_stack, 10) != NO_ERROR)
         printf("Push failed\n");
@@ -78,7 +88,7 @@ int main(void)
         printf("Popped value = %d\n", value);
     if (stack_pop(&my_stack, &value) == NO_ERROR)
         printf("Popped value = %d\n", value);
-    if (stack_pop(&my_stack, &value) == NO_ERROR)
+    //if (stack_pop(&my_stack, &value) == NO_ERROR)
         printf("Popped value = %d\n", value);
 
     stack_dump(&my_stack, NO_ERROR, __FILE__, __func__, __LINE__);
@@ -122,7 +132,7 @@ stack_err_t stack_pop(stack_t *stack, type_of_element *value)
         return UNDER_FLOW_SIZE;
     }
 
-    *value = stack -> array[(stack -> size) - 1];
+    *value = stack -> array[stack -> size];
     stack -> size = (stack -> size) - 1;
 
     return NO_ERROR;
@@ -147,49 +157,54 @@ stack_err_t stack_push(stack_t *stack, type_of_element value)
         }
     }
 
-    if (stack -> size >= stack -> capacity)
+    if (stack -> size >= stack -> capacity - NUMBER_OF_CANARIES)
     {
         size_t new_capacity = (stack -> capacity) * MULTIPLIER;
 
         type_of_element *new_array = (type_of_element*)realloc(stack -> array, new_capacity * sizeof(type_of_element));
+
+        if ((stack -> array) == NULL)
+            return ARRAY_POINTER_ERROR;
+
         stack -> array = new_array;
-        printf("555\n");
+        stack -> capacity = new_capacity;
 
-        for (size_t index = stack -> capacity; index < new_capacity; index++) // проинициализоровал выделенные элементы Poison но оно все равно не выводит как надо
-        {
+        setup_canaries(stack);
+
+        for (size_t index = (stack -> size) + 1; index < (stack -> capacity) - 1; index++) // доразберись почему size + 1
             stack -> array[index] = POISON;
-            printf("%d", stack -> array[index]);
-        }
-
     }
 
-    if ((stack -> array) == NULL)
-        return ARRAY_POINTER_ERROR; // на нужном месте стоит?
-
     stack -> size = (stack -> size) + 1;
-    stack -> array[(stack -> size) - 1] = value;
+    stack -> array[stack -> size] = value;
 
 
     return NO_ERROR;
 }
 
 
-stack_err_t stack_constructor(stack_t *stack, size_t initial_capacity)
+stack_err_t stack_constructor(stack_t *stack, size_t requested_capacity)
 {
     if (stack == NULL)
         return STACK_POINTER_ERROR;
 
-    stack -> array = (type_of_element*)calloc(initial_capacity, sizeof(type_of_element));
+    if (requested_capacity == 0)
+        return UNDER_FLOW_CAPACITY;
+
+    size_t total_capacity = requested_capacity + NUMBER_OF_CANARIES;
+
+    stack -> array = (type_of_element*)calloc(requested_capacity, sizeof(type_of_element));
 
     if (stack -> array == NULL)
         return ARRAY_POINTER_ERROR;
 
-    stack -> capacity = initial_capacity;
+    stack -> capacity = total_capacity;
+    stack -> size = INITIAL_SIZE;                                                                                                                               printf("MEOW\n");
 
-    for (size_t index = 0; index < stack -> capacity; index++)
+    setup_canaries(stack);
+
+    for (size_t index = 1; index < (stack -> capacity) - 1; index++)
         stack -> array[index] = POISON;
-
-    stack -> size = INITIAL_SIZE;
 
     return NO_ERROR;
 }
@@ -225,6 +240,10 @@ stack_err_t stack_verify(stack_t *stack, const char *file_name, const char *func
         return code_error;
     }
 
+    code_error = check_canaries(stack);
+    if (code_error != NO_ERROR)
+        return code_error;
+
     if ((stack -> size) > STACK_MAX_SIZE)
     {
         code_error = OVER_FLOW_SIZE;
@@ -239,7 +258,7 @@ stack_err_t stack_verify(stack_t *stack, const char *file_name, const char *func
         return code_error;
     }
 
-    if ((stack -> size) > (stack -> capacity))
+    if ((stack -> size) > (stack -> capacity) - NUMBER_OF_CANARIES)
     {
         code_error = OVER_FLOW_CAPACITY;
 
@@ -269,24 +288,52 @@ void stack_dump(stack_t *stack, stack_err_t code_error, const char *file_name, c
     assert(file_name     != NULL);
     assert(function_name != NULL);
 
-    //printf("------------------------------------------------------------------------------------------------\n"); //для отладки
     printf("The type of error is ");
     error_translator(code_error);
 
     printf("It was called from function %s at %s line %d\n", function_name, file_name, line);
 
+    printf("\nInformation about stack\n");
     printf("size = %zu\n", stack -> size);
-    printf("capacity = %zu\n", stack -> capacity);
+    printf("capacity = %zu (total including canaries)\n", stack -> capacity);
+    printf("data capacity = %zu (available for data)\n", get_data_capacity(stack -> capacity));
     printf("array[%p]\n", stack -> array);
 
-    if (code_error != ARRAY_POINTER_ERROR)
+    if ((code_error != ARRAY_POINTER_ERROR) && (stack -> array != NULL))
     {
-        for (int index = 0; index < stack -> capacity; index++)
+        printf("Array content:\n");
+        for (size_t index = 0; index < stack -> capacity; index++)
         {
-            if (stack -> array[index] == POISON)
-                printf("*[%zu] = %d [POISON]\n", index, stack -> array[index]);
+            const char *marker = NULL;
+
+            if (index == 0)
+            {
+                marker = (stack -> array[index] == CANARY_VALUE) ?
+                         "[FRONT CANARY]" : "[FRONT CANARY DAMAGED]";
+            }
+
+            else if (index == (stack -> capacity) - 1)
+            {
+                marker = (stack -> array[index] == CANARY_VALUE) ?
+                         "[BACK CANARY]" : "[BACK CANARY DAMAGED]";
+            }
+
+            else if (stack -> array[index] == POISON)
+                marker = "[POISON]";
+
+            else if (index <= stack -> size)
+                marker = "[ACTIVE DATA]";
+
             else
-                printf("[%zu] = %d\n", index, stack -> array[index]);
+                marker = "[FREE]";
+
+            printf("[%zu] = ", index);
+
+            if (index == 0 || index == (stack -> capacity) - 1)
+                printf("%X", stack->array[index]);
+            else
+                printf("%d", stack->array[index]);
+            printf(" %s\n", marker);
         }
     }
 }
@@ -313,6 +360,9 @@ void error_translator(stack_err_t code_error)
         case OVER_FLOW_SIZE:
             printf("OVER_FLOW_SIZE\n");
             break;
+        case CANARY_DAMAGED:
+            printf("CANARY_DAMAGED\n");
+            break;
         case NO_ERROR:
             printf("NO_ERROR\n");
             break;
@@ -321,4 +371,31 @@ void error_translator(stack_err_t code_error)
             break;
     }
 }
+
+size_t get_data_capacity(size_t total_capacity)
+{
+    if (total_capacity >= NUMBER_OF_CANARIES)
+        return total_capacity - NUMBER_OF_CANARIES;
+    else
+        return 0;
+}
+
+stack_err_t check_canaries(const stack_t *stack)
+{
+    if (stack -> array[0] != CANARY_VALUE)
+        return CANARY_DAMAGED;
+
+    if (stack -> array[(stack -> capacity) - 1] != CANARY_VALUE)
+        return CANARY_DAMAGED;
+
+    return NO_ERROR;
+}
+
+void setup_canaries(stack_t *stack)
+{
+    stack -> array[0] = CANARY_VALUE;
+    stack -> array[(stack -> capacity) - 1] = CANARY_VALUE;
+}
+
+
 
