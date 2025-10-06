@@ -1,5 +1,5 @@
 #ifndef CALCULATOR_H_
-#define CALCULATOR_H
+#define CALCULATOR_H_
 
 #include "stack.h"
 #include "arithm_oper.h"
@@ -20,19 +20,19 @@ enum code_type
     BAD_VALUE  = 10,
 };
 
-const char* PUSH = "PUSH";
-const char*  POP = "POP";
-const char*  OUT = "OUT";
-const char*  ADD = "ADD";
-const char*  SUB = "SUB";
-const char*  MUL = "MUL";
-const char*  DIV = "DIV";
-const char* SQRT = "SQRT";
-const char*  HLT = "HLT";
+const char *const  PUSH = "PUSH";
+const char *const  POP  = "POP";
+const char *const  OUT  = "OUT";
+const char *const  ADD  = "ADD";
+const char *const  SUB  = "SUB";
+const char *const  MUL  = "MUL";
+const char *const  DIV  = "DIV";
+const char *const SQRT  = "SQRT";
+const char *const  HLT  = "HLT";
 
-int get_command(const char *type_of_command, code_type *code_command, type_of_element *number,
+int get_command(code_type *code_command, type_of_element *number,
                 char *name_of_command, FILE *input_file);
 
 stack_err_t calc_online(stack_t *stack);
 
-#endif // CALCULATOR_H
+#endif // CALCULATOR_H_

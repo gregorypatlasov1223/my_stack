@@ -70,13 +70,12 @@ stack_err_t stack_push(stack_t *stack, type_of_element value)
 
         setup_canaries(stack);
 
-        for (size_t index = (stack -> size) + 1; index < (stack -> capacity) - 1; index++) // доразберись почему size + 1
+        for (size_t index = (stack -> size) + 1; index < (stack -> capacity) - 1; index++)
             stack -> array[index] = POISON;
     }
 
     stack -> size = (stack -> size) + 1;
     stack -> array[stack -> size] = value;
-
 
     return NO_ERROR;
 }
@@ -92,18 +91,17 @@ stack_err_t stack_constructor(stack_t *stack, size_t requested_capacity)
 
     size_t total_capacity = requested_capacity + NUMBER_OF_CANARIES;
 
-    stack -> array = (type_of_element*)calloc(total_capacity, sizeof(type_of_element));
-
-    if (stack -> array == NULL)
+    stack->array = (type_of_element*)calloc(total_capacity, sizeof(type_of_element));
+    if (stack->array == NULL)
         return ARRAY_POINTER_ERROR;
 
-    stack -> capacity = total_capacity;
-    stack -> size = INITIAL_SIZE;                                                                                                                               printf("MEOW\n");
+    stack->capacity = total_capacity;
+    stack->size = INITIAL_SIZE;
 
     setup_canaries(stack);
 
-    for (size_t index = 1; index < (stack -> capacity) - 1; index++)
-        stack -> array[index] = POISON;
+    for (size_t index = 1; index <= requested_capacity; index++)
+        stack->array[index] = POISON;
 
     return NO_ERROR;
 }
@@ -278,10 +276,13 @@ size_t get_data_capacity(size_t total_capacity)
 
 stack_err_t check_canaries(const stack_t *stack)
 {
-    if (stack -> array[0] != CANARY_VALUE)
+    if (stack -> capacity < NUMBER_OF_CANARIES)
         return CANARY_DAMAGED;
 
-    if (stack -> array[(stack -> capacity) - 1] != CANARY_VALUE)
+    if (stack -> array[0] != (type_of_element)CANARY_VALUE)
+        return CANARY_DAMAGED;
+
+    if (stack -> array[stack -> capacity - 1] != (type_of_element)CANARY_VALUE)
         return CANARY_DAMAGED;
 
     return NO_ERROR;
@@ -290,13 +291,11 @@ stack_err_t check_canaries(const stack_t *stack)
 
 stack_err_t setup_canaries(stack_t *stack)
 {
-    stack_err_t code_error = stack_verify(stack);
+    if (stack == NULL || stack -> array == NULL)
+        return STACK_POINTER_ERROR;
 
-    if (code_error != NO_ERROR)
-        return code_error;
-
-    stack -> array[0] = CANARY_VALUE; 
-    stack -> array[(stack -> capacity) - 1] = CANARY_VALUE;
+    stack -> array[0] = (type_of_element)CANARY_VALUE;
+    stack -> array[stack -> capacity - 1] = (type_of_element)CANARY_VALUE;
 
     return NO_ERROR;
 }

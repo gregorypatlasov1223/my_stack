@@ -16,6 +16,8 @@ int main(void)
         return INITIALIZE_ERROR;
     }
 
+    calc_online(&my_stack);
+
     // my_stack.size = 350;
     // my_stack.capacity = 340;  // OVER_FLOW_CAPACITY error
     // my_stack.size = -1;    // UNDER_FLOW_CAPACITY error
@@ -23,10 +25,10 @@ int main(void)
     // my_stack.array[0] = 0x12345678;  // Повредит переднюю канарейку
     // stack_verify(&my_stack);
 
-    if (stack_push(&my_stack, 10) != NO_ERROR)
-        printf("Push failed\n");
-    if (stack_push(&my_stack, 20) != NO_ERROR)
-        printf("Push failed\n");
+    // if (stack_push(&my_stack, 10) != NO_ERROR)
+    //     printf("Push failed\n");
+    // if (stack_push(&my_stack, 20) != NO_ERROR)
+    //     printf("Push failed\n");
     if (stack_push(&my_stack, 30) != NO_ERROR)
         printf("Push failed\n");
 
@@ -34,8 +36,8 @@ int main(void)
 
     if (stack_pop(&my_stack, &value) == NO_ERROR)
         printf("Popped value = %d\n", value);
-    if (stack_pop(&my_stack, &value) == NO_ERROR)
-        printf("Popped value = %d\n", value);
+    // if (stack_pop(&my_stack, &value) == NO_ERROR)
+    //     printf("Popped value = %d\n", value);
     // if (stack_pop(&my_stack, &value) == NO_ERROR)
     //     printf("Popped value = %d\n", value);
 
