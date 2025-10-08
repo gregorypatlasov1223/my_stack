@@ -35,7 +35,7 @@ stack_err_t calc_online(stack_t *stack)
 
     char name_of_command[50] = {0};
 
-    code_type code_of_command = BAD_VALUE;
+    code_type code_of_command = code_SHIT;
 
     type_of_element popped_value = 0;
     type_of_element number = 0;
@@ -51,7 +51,7 @@ stack_err_t calc_online(stack_t *stack)
                 printf("End of file reached. Normal termination.\n");
                 break;
             }
-            
+
             fprintf(stderr, "The command wasn't read. Try again\n");
             continue;
         }
@@ -174,7 +174,8 @@ int get_command(code_type *code_command, type_of_element *number,
     else if (strcmp("HLT", name_of_command) == 0)
         *code_command = code_HLT;
 
-    else {
+    else
+    {
         fprintf(stderr, "Unknown command: %s\n", name_of_command);
         return 0;
     }

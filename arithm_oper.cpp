@@ -5,6 +5,7 @@
 #include "error_types.h"
 #include "arithm_oper.h"
 
+
 stack_err_t stack_add(stack_t *stack)
 {
     stack_err_t code_error = stack_verify(stack);

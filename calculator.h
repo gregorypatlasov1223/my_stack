@@ -17,7 +17,6 @@ enum code_type
     code_DIV   = 7,
     code_SQRT  = 8,
     code_HLT   = 9,
-    BAD_VALUE  = 10,
 };
 
 const char *const  PUSH = "PUSH";
