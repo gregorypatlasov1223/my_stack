@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "error_types.h"
+#include "colour_codes.h"
 #include "stack.h"
 
 stack_err_t stack_pop(stack_t *stack, type_of_element *value)
@@ -15,7 +16,7 @@ stack_err_t stack_pop(stack_t *stack, type_of_element *value)
     {
         if (code_error == OVER_FLOW_CAPACITY || code_error == OVER_FLOW_SIZE)
         {
-            printf("Error: Stack is overflowed. Pop is failed\n");
+            printf(RED "Error: Stack is overflowed. Pop is failed\n" RESET);
             return code_error;
         }
         else
@@ -27,7 +28,7 @@ stack_err_t stack_pop(stack_t *stack, type_of_element *value)
 
     if ((stack -> size) <= 0)
     {
-        fprintf(stderr, "Error: Stack is underflowed\n"); // может тут сделать другую реализацию?
+        fprintf(stderr, RED "Error: Stack is underflowed\n" RESET); // цвета на нужном месте стоят?
         return UNDER_FLOW_SIZE;
     }
 
@@ -46,7 +47,7 @@ stack_err_t stack_push(stack_t *stack, type_of_element value)
     {
         if (code_error == OVER_FLOW_CAPACITY || code_error == OVER_FLOW_SIZE)
         {
-            printf("Error: Stack is overflowed\n");
+            printf(RED "Error: Stack is overflowed\n" RESET);
             return code_error;
         }
         else
@@ -174,13 +175,13 @@ void stack_dump(stack_t *stack, stack_err_t code_error, const char *file_name, c
     printf("The type of error is ");
     error_translator(code_error);
 
-    printf("It was called from function %s at %s line %d\n", function_name, file_name, line);
+    printf(CYAN "It was called from function %s at %s line %d\n" RESET, function_name, file_name, line);
 
-    printf("\nInformation about stack\n");
-    printf("size = %zu\n", stack -> size);
-    printf("capacity = %zu (total including canaries)\n", stack -> capacity);
-    printf("data capacity = %zu (available for data)\n", get_data_capacity(stack -> capacity));
-    printf("array[%p]\n", stack -> array);
+    printf(MAGENTA "\nInformation about stack\n" RESET);
+    printf(MAGENTA "size = %zu\n" RESET, stack -> size);
+    printf(MAGENTA "capacity = %zu (total including canaries)\n" RESET, stack -> capacity);
+    printf(MAGENTA "data capacity = %zu (available for data)\n" RESET, get_data_capacity(stack -> capacity));
+    printf(MAGENTA "array[%p]\n" RESET, stack -> array);
 
 
 
@@ -212,13 +213,13 @@ void stack_dump(stack_t *stack, stack_err_t code_error, const char *file_name, c
             else
                 marker = "[FREE]";
 
-            printf("[%zu] = ", index);
+            printf(YELLOW "[%zu] = " RESET, index);
 
             if (index == 0 || index == (stack -> capacity) - 1)
-                printf("%d", stack->array[index]);
+                printf(YELLOW "%d" RESET, stack->array[index]);
             else
-                printf("%d", stack->array[index]);
-            printf(" %s\n", marker);
+                printf(YELLOW "%d" RESET, stack->array[index]);
+            printf( YELLOW " %s\n" RESET, marker);
         }
     }
 }
@@ -229,37 +230,37 @@ void error_translator(stack_err_t code_error)
     switch(code_error)
     {
         case ARRAY_POINTER_ERROR:
-            printf("ARRAY_POINTER_ERROR\n");
+            printf(RED "ARRAY_POINTER_ERROR\n" RESET);
             break;
         case STACK_POINTER_ERROR:
-            printf("STACK_POINTER_ERROR\n");
+            printf(RED "STACK_POINTER_ERROR\n" RESET);
             break;
         case INITIALIZE_ERROR:
-            printf("INITIALIZE_ERROR");
+            printf(RED "INITIALIZE_ERROR" RESET);
             break;
         case UNDER_FLOW_CAPACITY:
-            printf("UNDER_FLOW_CAPACITY\n");
+            printf(RED "UNDER_FLOW_CAPACITY\n" RESET);
             break;
         case OVER_FLOW_CAPACITY:
-            printf("OVER_FLOW_CAPACITY\n");
+            printf(RED "OVER_FLOW_CAPACITY\n" RESET);
             break;
         case UNDER_FLOW_SIZE:
-            printf("UNDER_FLOW_SIZE\n");
+            printf(RED "UNDER_FLOW_SIZE\n" RESET);
             break;
         case OVER_FLOW_SIZE:
-            printf("OVER_FLOW_SIZE\n");
+            printf(RED "OVER_FLOW_SIZE\n" RESET);
             break;
         case CANARY_DAMAGED:
-            printf("CANARY_DAMAGED\n");
+            printf(RED "CANARY_DAMAGED\n" RESET);
             break;
         case ERROR_DIV_BY_0:
-            printf("ERROR_DIV_BY_0\n");
+            printf(RED "ERROR_DIV_BY_0\n" RESET);
             break;
         case NO_ERROR:
-            printf("NO_ERROR\n");
+            printf(GREEN "NO_ERROR\n" RESET);
             break;
         default:
-            printf("UNKNOWN_ERROR (%d)\n", code_error);
+            printf(RED "UNKNOWN_ERROR (%d)\n" RESET, code_error);
             break;
     }
 }
@@ -311,7 +312,7 @@ stack_err_t print_stack(stack_t *stack, FILE *output_file)
     fprintf(output_file, "stack:\n");
 
     for (size_t index = 1; index <= stack -> size; index++)
-        printf("[%zu] = %d\n", index, stack -> array[index]);
+        printf(CYAN "[%zu] = %d\n" RESET, index, stack -> array[index]);
 
     return NO_ERROR;
 }

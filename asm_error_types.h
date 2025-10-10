@@ -8,7 +8,9 @@ enum assembler_type_error
     ASM_UNKNOWN_COMMAND_ERROR         = 2,
     ASM_CANNOT_OPEN_INPUT_FILE_ERROR  = 3,
     ASM_CANNOT_OPEN_OUTPUT_FILE_ERROR = 4,
-    ASM_READING_FILE_ERROR            = 5
+    ASM_READING_FILE_ERROR            = 5,
+    ASM_INCORRECT_NUMBER_OF_ARGUMENTS = 6,
+    ASM_INVALID_ARGUMENT_ERROR        = 7
 };
 
 #endif // ASM_ERROR_TYPES_H_
