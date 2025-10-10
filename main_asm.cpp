@@ -29,19 +29,7 @@ int main(int argc, char *argv[])
         return error;
     }
 
-    error = read_from_instruction_file_to_buffer(&asm_instance);
-
-    if (error != ASM_NO_ERROR)
-    {
-        fprintf(stderr, "Failed to read_from_instruction_file_to_buffer\n");
-        asm_error_translator(error);
-        assembler_destructor(&asm_instance);
-
-        return error;
-    }
-
     printf("instruction_file_to_buffer loaded successfully\n");
-
     printf("File size: %zu bytes\n", strlen(asm_instance.instruction_buffer));
 
     error = from_buffer_to_binary_file(&asm_instance);
