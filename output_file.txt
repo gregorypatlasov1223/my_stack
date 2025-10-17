@@ -1,2 +1,2 @@
-stack:
+Calculated value [1] = 5
 Calculation completed

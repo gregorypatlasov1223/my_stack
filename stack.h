@@ -34,7 +34,7 @@ stack_err_t check_canaries(const stack_t *stack);
 stack_err_t setup_canaries(stack_t *stack);
 size_t get_data_capacity(size_t total_capacity);
 
-stack_err_t print_stack(stack_t *stack, FILE *output_file);
+stack_err_t print_calculated_value(stack_t *stack, FILE *output_file);
 
 struct stack_t
 {

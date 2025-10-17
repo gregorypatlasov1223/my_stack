@@ -2,6 +2,7 @@
 #define PROCESSOR_H_
 
 #include <sys/stat.h>
+
 #include "stack.h"
 #include "proc_error_types.h"
 

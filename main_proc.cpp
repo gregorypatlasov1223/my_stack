@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "error_types.h"
-#include "proc_error_types.h"
 #include "stack.h"
 #include "processor.h"
+#include "error_types.h"
+#include "proc_error_types.h"
 
 int main(int argc, const char** argv)
 {
@@ -42,7 +42,7 @@ int main(int argc, const char** argv)
     {
         fprintf(stderr, "Error: Binary file is empty or invalid\n");
         processor_destructor(&proc_struct);
-        
+
         return 1;
     }
 

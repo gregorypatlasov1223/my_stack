@@ -4,13 +4,12 @@
 #include <assert.h>
 #include <sys/stat.h>
 
-#include "proc_error_types.h"
+#include "stack.h"
+#include "processor.h"
 #include "calculator.h"
 #include "arithm_oper.h"
-#include "processor.h"
 #include "colour_codes.h"
-#include "stack.h"
-
+#include "proc_error_types.h"
 
 void proc_error_translator(processor_error_type error)
 {

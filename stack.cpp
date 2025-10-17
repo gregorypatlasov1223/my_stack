@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "error_types.h"
-#include "colour_codes.h"
-#include "arithm_oper.h"
 #include "stack.h"
+#include "error_types.h"
+#include "arithm_oper.h"
+#include "colour_codes.h"
 
 stack_err_t stack_pop(stack_t *stack, type_of_element *value)
 {
@@ -33,8 +33,9 @@ stack_err_t stack_pop(stack_t *stack, type_of_element *value)
         return UNDER_FLOW_SIZE;
     }
 
-    *value = stack -> array[stack -> size];
-    stack -> size = stack -> size - 1;
+    *value = stack -> array[stack -> size];  // берем элемент
+    stack -> array[stack -> size] = POISON;  // очищаем ячейку
+    stack -> size = stack -> size - 1;       // уменьшаем размер
 
     return NO_ERROR;
 }
@@ -303,17 +304,19 @@ stack_err_t setup_canaries(stack_t *stack)
 }
 
 
-stack_err_t print_stack(stack_t *stack, FILE *output_file)
+stack_err_t print_calculated_value(stack_t *stack, FILE *output_file)
 {
     stack_err_t code_error = stack_verify(stack);
 
     if (code_error != NO_ERROR)
         return code_error;
 
-    fprintf(output_file, "stack:\n");
+    size_t index = 1;
+    printf(CYAN "Calculated value [%zu] = %d\n" RESET, index, stack -> array[index]);
+    fprintf(output_file, "Calculated value [%zu] = %d\n", index, stack -> array[index]);
 
-    for (size_t index = 1; index <= stack -> size; index++)
-        printf(CYAN "[%zu] = %d\n" RESET, index, stack -> array[index]);
+    // for (size_t index = 1; index <= stack -> size; index++)
+    //     printf(CYAN "Calculated value [%zu] = %d\n" RESET, index, stack -> array[index]);
 
     return NO_ERROR;
 }

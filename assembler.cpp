@@ -9,6 +9,10 @@
 #include "colour_codes.h"
 #include "asm_error_types.h"
 
+const size_t START_ASCII = 32;
+const size_t END_ASCII   = 126;
+
+
 code_type get_operation_code(const char* name_of_command)
 {
     assert(name_of_command != NULL);
@@ -138,8 +142,9 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
         name_of_command[index] = '\0';
 
         printf("Processing command: '");
-        for (int i = 0; i < index; i++) {
-            if (name_of_command[i] >= 32 && name_of_command[i] <= 126) // 32 и 126 - диапазон ASCII кодов
+        for (int i = 0; i < index; i++)
+        {
+            if (name_of_command[i] >= START_ASCII && name_of_command[i] <= END_ASCII) // 32 и 126 - нужный диапазон ASCII кодов
                 printf("%c", name_of_command[i]);
             else
                 printf("[0x%02X]", (unsigned char)name_of_command[i]);
@@ -153,7 +158,7 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
             fprintf(stderr, "Unknown command: '");
             for (int i = 0; i < index; i++)
             {
-                if (name_of_command[i] >= 32 && name_of_command[i] <= 126)
+                if (name_of_command[i] >= START_ASCII && name_of_command[i] <= END_ASCII)
                     fprintf(stderr, "%c", name_of_command[i]);
                 else
                     fprintf(stderr, "[0x%02X]", (unsigned char)name_of_command[i]);

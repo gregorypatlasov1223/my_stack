@@ -6,8 +6,7 @@
 #include "stack.h"
 #include "calculator.h"
 #include "error_types.h"
-
-
+#include "colour_codes.h"
 
 stack_err_t calc_online(stack_t *stack)
 {
@@ -58,7 +57,7 @@ stack_err_t calc_online(stack_t *stack)
 
         if (code_of_command == code_HLT)
         {
-            printf("HLT command received. Stopping.\n");
+            printf(GREEN "HLT command received. Stopping.\n" RESET);
             break;
         }
 
@@ -102,7 +101,7 @@ stack_err_t calc_online(stack_t *stack)
                 break;
 
             case code_OUT:
-                if (print_stack(stack, output_file) != NO_ERROR)
+                if (print_calculated_value(stack, output_file) != NO_ERROR)
                     fprintf(stderr, "Print failed\n");
                 break;
 
