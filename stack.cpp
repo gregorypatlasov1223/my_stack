@@ -4,6 +4,7 @@
 
 #include "error_types.h"
 #include "colour_codes.h"
+#include "arithm_oper.h"
 #include "stack.h"
 
 stack_err_t stack_pop(stack_t *stack, type_of_element *value)
@@ -26,14 +27,14 @@ stack_err_t stack_pop(stack_t *stack, type_of_element *value)
         }
     }
 
-    if ((stack -> size) <= 0)
+    if (stack -> size < 0)
     {
-        fprintf(stderr, RED "Error: Stack is underflowed\n" RESET); // цвета на нужном месте стоят?
+        fprintf(stderr, RED "Error: Stack is underflowed\n" RESET);
         return UNDER_FLOW_SIZE;
     }
 
     *value = stack -> array[stack -> size];
-    stack -> size = (stack -> size) - 1;
+    stack -> size = stack -> size - 1;
 
     return NO_ERROR;
 }
@@ -57,7 +58,7 @@ stack_err_t stack_push(stack_t *stack, type_of_element value)
         }
     }
 
-    if (stack -> size >= stack -> capacity - NUMBER_OF_CANARIES)
+    if (stack->size >= get_data_capacity(stack -> capacity))
     {
         size_t new_capacity = (stack -> capacity) * MULTIPLIER;
 
@@ -92,12 +93,12 @@ stack_err_t stack_constructor(stack_t *stack, size_t requested_capacity)
 
     size_t total_capacity = requested_capacity + NUMBER_OF_CANARIES;
 
-    stack->array = (type_of_element*)calloc(total_capacity, sizeof(type_of_element));
+    stack -> array = (type_of_element*)calloc(total_capacity, sizeof(type_of_element));
     if (stack->array == NULL)
         return ARRAY_POINTER_ERROR;
 
-    stack->capacity = total_capacity;
-    stack->size = INITIAL_SIZE;
+    stack -> capacity = total_capacity;
+    stack -> size = 0;
 
     setup_canaries(stack);
 

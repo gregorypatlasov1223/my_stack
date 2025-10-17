@@ -126,9 +126,9 @@ stack_err_t stack_sqrt(stack_t *stack)
 
     stack_pop(stack, &number);
 
-    type_of_element sqrt = number;
+    type_of_element sqrt_result = (type_of_element)sqrt(number);
 
-    stack_push(stack, sqrt);
+    stack_push(stack, sqrt_result);
 
     code_error = stack_verify(stack);
     if (code_error != NO_ERROR)

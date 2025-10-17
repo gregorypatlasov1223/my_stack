@@ -116,6 +116,7 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
         {
             if (*buffer_pointer == '\n')
                 line_number++;
+
             buffer_pointer++;
         }
 
@@ -138,10 +139,8 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
 
         printf("Processing command: '");
         for (int i = 0; i < index; i++) {
-            if (name_of_command[i] >= 32 && name_of_command[i] <= 126)
-            {
+            if (name_of_command[i] >= 32 && name_of_command[i] <= 126) // 32 и 126 - диапазон ASCII кодов
                 printf("%c", name_of_command[i]);
-            }
             else
                 printf("[0x%02X]", (unsigned char)name_of_command[i]);
         }

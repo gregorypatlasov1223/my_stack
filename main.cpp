@@ -10,7 +10,7 @@ int main(void)
 {
     stack_t my_stack = {0};
 
-    if (stack_constructor(&my_stack, 50) != NO_ERROR)
+    if (stack_constructor(&my_stack, 100) != NO_ERROR)
     {
         fprintf(stderr, "Failed to initialize stack\n");
         return INITIALIZE_ERROR;
