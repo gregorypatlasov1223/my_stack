@@ -1,17 +1,17 @@
 #include <stdio.h>
+#include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/stat.h>
 
+#include "common.h"
 #include "assembler.h"
 #include "calculator.h"
 #include "colour_codes.h"
 #include "asm_error_types.h"
 
-const size_t START_ASCII = 32;
-const size_t END_ASCII   = 126;
-
+const int MAX_SIZE_OF_REGISTERS = 32;
 
 code_type get_operation_code(const char* name_of_command)
 {
@@ -25,6 +25,12 @@ code_type get_operation_code(const char* name_of_command)
 
     if (strcmp(name_of_command, "POP") == 0)
         return code_POP;
+
+    if (strcmp(name_of_command, "POPR") == 0)
+        return code_POPR;
+
+    if (strcmp(name_of_command, "PUSHR") == 0)
+        return code_PUSHR;
 
     if (strcmp(name_of_command, "ADD") == 0)
         return code_ADD;
@@ -109,64 +115,23 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
         return ASM_CANNOT_OPEN_OUTPUT_FILE_ERROR;
     }
 
-    char *buffer_pointer = assembler_pointer -> instruction_buffer;
+    char *buffer_ptr = assembler_pointer -> instruction_buffer;
+    char name_of_command[50] = {};
     size_t number_of_commands = 0;
-    int line_number = 1;
+    int bytes_read = 0;  // используем int вместо size_t
 
-    while (*buffer_pointer != '\0')
+    while (sscanf(buffer_ptr, "%49s%n", name_of_command, &bytes_read) == 1)
     {
-        while (*buffer_pointer == ' ' || *buffer_pointer == '\n' || //скип пробельных символов
-               *buffer_pointer == '\t' || *buffer_pointer == '\r')
-        {
-            if (*buffer_pointer == '\n')
-                line_number++;
+        buffer_ptr += bytes_read;
 
-            buffer_pointer++;
-        }
-
-        if (*buffer_pointer == '\0')
-            break;
-
-        char name_of_command[50] = {0};
-        int index = 0;
-
-        while (*buffer_pointer != ' ' && *buffer_pointer != '\n' &&   // читаем до любого пробельного символа
-               *buffer_pointer != '\t' && *buffer_pointer != '\r' &&
-               *buffer_pointer != '\0' && index < 49)
-        {
-            name_of_command[index] = *buffer_pointer;
-            index++;
-            buffer_pointer++;
-        }
-
-        name_of_command[index] = '\0';
-
-        printf("Processing command: '");
-        for (int i = 0; i < index; i++)
-        {
-            if (name_of_command[i] >= START_ASCII && name_of_command[i] <= END_ASCII) // 32 и 126 - нужный диапазон ASCII кодов
-                printf("%c", name_of_command[i]);
-            else
-                printf("[0x%02X]", (unsigned char)name_of_command[i]);
-        }
-        printf("' (line %d)\n", line_number);
+        printf("Processing command: '%s'\n", name_of_command);
 
         code_type code_of_command = get_operation_code(name_of_command);
 
         if (code_of_command == code_SHIT)
         {
-            fprintf(stderr, "Unknown command: '");
-            for (int i = 0; i < index; i++)
-            {
-                if (name_of_command[i] >= START_ASCII && name_of_command[i] <= END_ASCII)
-                    fprintf(stderr, "%c", name_of_command[i]);
-                else
-                    fprintf(stderr, "[0x%02X]", (unsigned char)name_of_command[i]);
-            }
-
-            fprintf(stderr, "'\n");
+            fprintf(stderr, "Unknown command: '%s'\n", name_of_command);
             fclose(binary_file);
-
             return ASM_UNKNOWN_COMMAND_ERROR;
         }
 
@@ -174,34 +139,65 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
 
         if (code_of_command == code_PUSH || code_of_command == code_POP)
         {
-            while (*buffer_pointer == ' ' || *buffer_pointer == '\t' || *buffer_pointer == '\r') // пропускаем пробелы после команды
-                buffer_pointer++;
-
-            type_of_element argument = 0;
-            if (sscanf(buffer_pointer, "%d", &argument) == 1)
+            type_of_element number_arg = 0;
+            if (sscanf(buffer_ptr, "%d%n", &number_arg, &bytes_read) == 1)
             {
-                fwrite(&argument, sizeof(type_of_element), 1, binary_file);
-
-                while (*buffer_pointer != ' ' && *buffer_pointer != '\n' &&                // пропускаем аргумент
-                       *buffer_pointer != '\t' && *buffer_pointer != '\r' &&
-                       *buffer_pointer != '\0')
-                    buffer_pointer++;
+                fwrite(&number_arg, sizeof(type_of_element), 1, binary_file);
+                buffer_ptr += bytes_read;
             }
             else
             {
-                fprintf(stderr, "Failed to read argument for command: %s\n", name_of_command);
-                fclose(binary_file);
+                char register_name[MAX_SIZE_OF_REGISTERS] = {};
+                if (sscanf(buffer_ptr, "%31s%n", register_name, &bytes_read) != 1)
+                {
+                    fprintf(stderr, "Failed to read argument for command: %s\n", name_of_command);
+                    fclose(binary_file);
+                    return ASM_INVALID_ARGUMENT_ERROR;
+                }
 
-                return ASM_INVALID_ARGUMENT_ERROR;
+                register_code reg = get_register_by_name(register_name);
+                if (reg == REG_INVALID)
+                {
+                    fprintf(stderr, "Invalid register: %s\n", register_name);
+                    fclose(binary_file);
+                    return ASM_ERROR_INVALID_REGISTER;
+                }
+
+                fwrite(&reg, sizeof(register_code), 1, binary_file);
+                buffer_ptr += bytes_read;
             }
+        }
+        else if (code_of_command == code_PUSHR || code_of_command == code_POPR)
+        {
+            char register_name[MAX_SIZE_OF_REGISTERS] = {};
+            if (sscanf(buffer_ptr, "%31s%n", register_name, &bytes_read) != 1)
+            {
+                fprintf(stderr, "Expected register for command: %s\n", name_of_command);
+                fclose(binary_file);
+                return ASM_ERROR_EXPECTED_REGISTER;
+            }
+
+            register_code reg = get_register_by_name(register_name);
+            if (reg == REG_INVALID)
+            {
+                fprintf(stderr, "Invalid register: %s\n", register_name);
+                fclose(binary_file);
+                return ASM_ERROR_INVALID_REGISTER;
+            }
+
+            fwrite(&reg, sizeof(register_code), 1, binary_file);
+            buffer_ptr += bytes_read;
         }
 
         number_of_commands++;
+
+        while (*buffer_ptr == ' ' || *buffer_ptr == '\t' || *buffer_ptr == '\n' || *buffer_ptr == '\r')
+            buffer_ptr++;
     }
 
+    fclose(binary_file);
     printf("Processed %zu commands successfully\n", number_of_commands);
 
-    fclose(binary_file);
     return ASM_NO_ERROR;
 }
 
@@ -226,22 +222,6 @@ assembler_type_error assembler_constructor(assembler* assembler_pointer, const c
 
         return ASM_ALLOCATION_FAILED_ERROR;
     }
-
-//     FILE *instruction_file = fopen(input_filename, "r");
-//      if (instruction_file == NULL)
-//     {
-//         fprintf(stderr, "Error: Cannot open instruction_file.txt\n");
-//         return ASM_CANNOT_OPEN_INPUT_FILE_ERROR;
-//     }
-//     fclose(instruction_file); // закрываем, так как будем читать через read_from_instruction_file_to_buffer
-//
-//     FILE *binary_file = fopen(output_filename, "wb");
-//     if (binary_file == NULL)
-//     {
-//         fprintf(stderr, "Error: Cannot open binary file for writing\n");
-//         return ASM_CANNOT_OPEN_OUTPUT_FILE_ERROR;
-//     }
-//     fclose(binary_file);
 
     assembler_type_error error = read_from_instruction_file_to_buffer(assembler_pointer);
     if (error != ASM_NO_ERROR)
@@ -289,42 +269,8 @@ void assembler_destructor(assembler* assembler_pointer)
         free(assembler_pointer -> instruction_filename);
         assembler_pointer -> instruction_filename = NULL;
     }
-
-//     if (assembler_pointer->binary_file != NULL) // закрываем файлы, если они открыты
-//     {
-//         fclose(assembler_pointer -> binary_file);
-//         assembler_pointer -> binary_file = NULL;
-//     }
-//
-//     if (assembler_pointer -> instruction_file != NULL)
-//     {
-//         fclose(assembler_pointer -> instruction_file);
-//         assembler_pointer -> instruction_file = NULL;
-//     }
 }
 
-
-size_t get_file_size(FILE *file)
-{
-    assert(file != NULL);
-
-    struct stat stat_buffer = {};
-
-    int file_descriptor = fileno(file);
-    if (file_descriptor == -1)
-    {
-        fprintf(stderr, RED "Error: Cannot get file descriptor\n" RESET);
-        return 0;
-    }
-
-    if (fstat(file_descriptor, &stat_buffer) != 0)
-    {
-        fprintf(stderr, RED "Error: Cannot get file stats\n" RESET);
-        return 0;
-    }
-
-    return (size_t)stat_buffer.st_size;
-}
 
 void asm_error_translator(assembler_type_error error)
 {
@@ -356,6 +302,12 @@ void asm_error_translator(assembler_type_error error)
             break;
         case ASM_CANNOT_GET_FILE_DESCRIPTOR_ERROR:
             fprintf(stderr, "Error: Cannot get file descriptor\n");
+            break;
+        case ASM_ERROR_INVALID_REGISTER:
+            fprintf(stderr, "Error: Used invalid register\n");
+            break;
+        case ASM_ERROR_EXPECTED_REGISTER:
+            fprintf(stderr, "Error: Get wrong unexpected register\n");
             break;
         default:
             fprintf(stderr, "Error: Unknown error code: %d\n", error);

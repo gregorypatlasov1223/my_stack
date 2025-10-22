@@ -4,6 +4,7 @@
 #include <assert.h>
 
 #include "stack.h"
+#include "common.h"
 #include "calculator.h"
 #include "error_types.h"
 #include "colour_codes.h"
@@ -100,11 +101,24 @@ stack_err_t calc_online(stack_t *stack)
                     fprintf(stderr, "Sqrt failed\n");
                 break;
 
+             case code_IN:
+                fprintf(stderr, "IN command not supported in calculator mode\n");
+                break;
+
+            case code_PUSHR:
+                fprintf(stderr, "PUSHR command not supported in calculator mode\n");
+                break;
+
+            case code_POPR:
+                fprintf(stderr, "POPR command not supported in calculator mode\n");
+                break;
+
             case code_OUT:
                 if (print_calculated_value(stack, output_file) != NO_ERROR)
                     fprintf(stderr, "Print failed\n");
                 break;
 
+            case code_SHIT:
             default:
                 fprintf(stderr, "Syntax error. The command wasn't read. Try again\n");
         }

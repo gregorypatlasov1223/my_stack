@@ -12,6 +12,8 @@ enum assembler_type_error
     ASM_INCORRECT_NUMBER_OF_ARGUMENTS    = 6,
     ASM_INVALID_ARGUMENT_ERROR           = 7,
     ASM_CANNOT_GET_FILE_DESCRIPTOR_ERROR = 8,
+    ASM_ERROR_EXPECTED_REGISTER          = 9,
+    ASM_ERROR_INVALID_REGISTER           = 10
 };
 
 #endif // ASM_ERROR_TYPES_H_

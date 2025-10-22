@@ -13,12 +13,12 @@ struct assembler
     int  *binary_buffer;
 };
 
+void asm_error_translator(assembler_type_error error);
+void assembler_destructor(assembler* assembler_pointer);
 code_type get_operation_code(const char* name_of_command);
+
 assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer);
 assembler_type_error read_from_instruction_file_to_buffer(assembler *assembler_pointer);
 assembler_type_error assembler_constructor(assembler* assembler_pointer, const char* input_filename, const char* output_filename);
-void assembler_destructor(assembler* assembler_pointer);
-void asm_error_translator(assembler_type_error error);
-size_t get_file_size(FILE *file);
 
 #endif // ASSEMBLER_H_

@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 
 #include "stack.h"
+#include "common.h"
 #include "processor.h"
 #include "calculator.h"
 #include "arithm_oper.h"
@@ -50,26 +51,10 @@ void proc_error_translator(processor_error_type error)
 }
 
 
-// processor_error_type execute_binary(const char* binary_filename, processor *proc_struct_pointer) // почему тут proc_struct_pointer
-// {
-//     assert(binary_filename != NULL);
-//
-//     processor_error_type error = assembler_type_error read_binary_file_to_buffer(proc_struct_pointer, binary_filename);
-//     if (error != PROC_ERROR_NO)
-//         return error;
-//
-//     error = execute_processor(proc_struct_pointer);
-//     if (error != PROC_ERROR_NO)
-//         return error;
-//
-//     return PROC_ERROR_NO;
-// }
-
-
 processor_error_type execute_processor(processor *processor_pointer)
 {
-    assert(processor_pointer);
-    assert(processor_pointer -> code_buffer);
+    assert(processor_pointer != NULL);
+    assert(processor_pointer -> code_buffer != NULL);
 
     processor_error_type proc_error = PROC_ERROR_NO;
     stack_err_t stack_error = NO_ERROR;
@@ -79,8 +64,9 @@ processor_error_type execute_processor(processor *processor_pointer)
         int current_instruction_counter = processor_pointer -> instruction_counter;
         code_type operation_code = (code_type)processor_pointer -> code_buffer[current_instruction_counter];
         int argument = 0;
+        register_code reg = REG_INVALID;
 
-        if (operation_code == code_PUSH)
+        if (operation_code == code_PUSH || operation_code == code_PUSHR || operation_code == code_POPR)
         {
             if (current_instruction_counter + 1 >= (int)processor_pointer -> code_buffer_size)
                 return PROC_ERROR_INVALID_STATE;
@@ -99,9 +85,40 @@ processor_error_type execute_processor(processor *processor_pointer)
             {
                 type_of_element popped_value = 0;
                 stack_error = stack_pop(&processor_pointer -> stack, &popped_value);
-                processor_pointer -> instruction_counter += 2;
+                processor_pointer -> instruction_counter += 1;
                 break;
             }
+
+            case code_PUSHR:
+                if (argument >= REG_RAX && argument <= REG_RHX)
+                {
+                    reg = (register_code)argument;
+                    int register_value = processor_pointer -> registers[reg];
+                    stack_error = stack_push(&processor_pointer -> stack, register_value);
+                }
+
+                else
+                    return PROC_ERROR_INVALID_STATE;
+                processor_pointer -> instruction_counter += 2;
+                break;
+
+            case code_POPR:
+                if (argument >= REG_RAX && argument <= REG_RHX)
+                {
+                    type_of_element popped_value = 0;
+                    stack_error = stack_pop(&processor_pointer -> stack, &popped_value);
+                    if (stack_error == NO_ERROR)
+                    {
+                        reg = (register_code)argument;
+                        processor_pointer -> registers[reg] = popped_value;
+                    }
+                }
+
+                else
+                    return PROC_ERROR_INVALID_STATE;
+
+                processor_pointer -> instruction_counter += 2;
+                break;
 
             case code_ADD:
                 stack_error = stack_add(&processor_pointer -> stack);
@@ -137,7 +154,7 @@ processor_error_type execute_processor(processor *processor_pointer)
                 else
                     proc_error = PROC_ERROR_INVALID_STATE;
 
-                processor_pointer -> instruction_counter += 2;
+                processor_pointer -> instruction_counter += 1;
                 break;
             }
 
@@ -161,9 +178,7 @@ processor_error_type execute_processor(processor *processor_pointer)
 
         if (proc_error != PROC_ERROR_NO || stack_error != NO_ERROR)
         {
-            processor_dump(processor_pointer,
-                           proc_error,
-                          "Processor Execution failed");
+            processor_dump(processor_pointer, proc_error, "Processor execution failed");
             return proc_error;
         }
     }
@@ -181,7 +196,7 @@ processor_error_type read_binary_file_to_buffer(processor* processor_pointer, co
     if (binary_file == NULL)
         return PROC_ERROR_CANNOT_OPEN_BINARY_FILE;
 
-    size_t file_size = get_size_of_binary_file(binary_file);
+    size_t file_size = get_file_size(binary_file);
     if (file_size <= 0 || file_size % sizeof(int) != 0)
     {
         fclose(binary_file);
@@ -213,38 +228,18 @@ processor_error_type read_binary_file_to_buffer(processor* processor_pointer, co
 }
 
 
-size_t get_size_of_binary_file(FILE *file)
-{
-    assert(file != NULL);
-
-    struct stat stat_buffer = {};
-
-    int file_descriptor = fileno(file);
-    if (file_descriptor == -1)
-    {
-        fprintf(stderr, RED "Error: Cannot get file descriptor\n" RESET);
-        return 0;
-    }
-
-    if (fstat(file_descriptor, &stat_buffer) != 0)
-    {
-        fprintf(stderr, RED "Error: Cannot get file stats\n" RESET);
-        return 0;
-    }
-
-    return (size_t)stat_buffer.st_size;
-}
-
-
 processor_error_type processor_constructor(processor* processor_pointer, size_t starting_capacity)
 {
     assert(processor_pointer != NULL);
     assert(starting_capacity > 0);
 
-    stack_err_t stack_constructor_result = stack_constructor(&(processor_pointer -> stack), starting_capacity);  // Исправлен тип
+    stack_err_t stack_constructor_result = stack_constructor(&(processor_pointer -> stack), starting_capacity);
 
     if (stack_constructor_result != NO_ERROR)
         return PROC_ERROR_STACK_OPERATION_FAILED;
+
+    for (int i = 0; i < NUMBER_OF_REGISTERS; i++)
+        processor_pointer -> registers[i] = 0;
 
     processor_pointer -> instruction_counter = 0;
     processor_pointer -> code_buffer_size    = 0;
@@ -262,6 +257,9 @@ void processor_destructor(processor *processor_pointer)
         free(processor_pointer -> code_buffer);
 
     stack_destructor(&(processor_pointer -> stack));
+
+    for (int i = 0; i < NUMBER_OF_REGISTERS; i++)
+        processor_pointer -> registers[i] = 0;
 
     processor_pointer -> instruction_counter = 0;
     processor_pointer -> code_buffer_size    = 0;
@@ -283,7 +281,7 @@ void processor_dump(processor* proc, processor_error_type code_error, const char
 
     stack_dump(&(proc -> stack), NO_ERROR, __FILE__, __func__, __LINE__); // тут бы const сделать
 
-    printf("Processor error: "); // временно убрал вызов stack_dump из-за проблем с типами
+    printf("Processor error: ");
     proc_error_translator(code_error);
 
     printf("Instruction counter: %d\n",  proc -> instruction_counter);
