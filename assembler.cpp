@@ -32,6 +32,27 @@ code_type get_operation_code(const char* name_of_command)
     if (strcmp(name_of_command, "PUSHR") == 0)
         return code_PUSHR;
 
+    if (strcmp(name_of_command, "JMP") == 0)
+        return code_JMP;
+
+    if (strcmp(name_of_command, "JB") == 0)
+        return code_JB;
+
+    if (strcmp(name_of_command, "JBE") == 0)
+        return code_JBE;
+
+    if (strcmp(name_of_command, "JA") == 0)
+        return code_JA;
+
+    if (strcmp(name_of_command, "JAE") == 0)
+        return code_JAE;
+
+    if (strcmp(name_of_command, "JE") == 0)
+        return code_JE;
+
+    if (strcmp(name_of_command, "JNE") == 0)
+        return code_JNE;
+
     if (strcmp(name_of_command, "ADD") == 0)
         return code_ADD;
 
@@ -118,7 +139,7 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
     char *buffer_ptr = assembler_pointer -> instruction_buffer;
     char name_of_command[50] = {};
     size_t number_of_commands = 0;
-    int bytes_read = 0;  // используем int вместо size_t
+    int bytes_read = 0;
 
     while (sscanf(buffer_ptr, "%49s%n", name_of_command, &bytes_read) == 1)
     {
@@ -145,28 +166,15 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
                 fwrite(&number_arg, sizeof(type_of_element), 1, binary_file);
                 buffer_ptr += bytes_read;
             }
+
             else
             {
-                char register_name[MAX_SIZE_OF_REGISTERS] = {};
-                if (sscanf(buffer_ptr, "%31s%n", register_name, &bytes_read) != 1)
-                {
-                    fprintf(stderr, "Failed to read argument for command: %s\n", name_of_command);
-                    fclose(binary_file);
-                    return ASM_INVALID_ARGUMENT_ERROR;
-                }
-
-                register_code reg = get_register_by_name(register_name);
-                if (reg == REG_INVALID)
-                {
-                    fprintf(stderr, "Invalid register: %s\n", register_name);
-                    fclose(binary_file);
-                    return ASM_ERROR_INVALID_REGISTER;
-                }
-
-                fwrite(&reg, sizeof(register_code), 1, binary_file);
-                buffer_ptr += bytes_read;
+                fprintf(stderr, "Expected number argument for command: %s\n", name_of_command);
+                fclose(binary_file);
+                return ASM_INVALID_ARGUMENT_ERROR;
             }
         }
+
         else if (code_of_command == code_PUSHR || code_of_command == code_POPR)
         {
             char register_name[MAX_SIZE_OF_REGISTERS] = {};
@@ -188,6 +196,24 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
             fwrite(&reg, sizeof(register_code), 1, binary_file);
             buffer_ptr += bytes_read;
         }
+        
+        else if (code_of_command >= code_JMP && code_of_command <= code_JNE)
+        {
+            int jump_address = 0;
+
+            if (sscanf(buffer_ptr, "%d%n", &jump_address, &bytes_read) == 1)
+            {
+                fwrite(&jump_address, sizeof(int), 1, binary_file);
+                buffer_ptr += bytes_read;
+            }
+
+            else
+            {
+                fprintf(stderr, "Expected jump address for command: %s\n", name_of_command);
+                fclose(binary_file);
+                return ASM_INVALID_ARGUMENT_ERROR;
+            }
+        }
 
         number_of_commands++;
 
@@ -200,6 +226,8 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
 
     return ASM_NO_ERROR;
 }
+
+
 
 
 assembler_type_error assembler_constructor(assembler* assembler_pointer, const char* input_filename, const char* output_filename)
@@ -315,3 +343,24 @@ void asm_error_translator(assembler_type_error error)
     }
 }
 
+const char *get_register_name(register_code reg)
+{
+    if (reg >= REG_RAX && reg <= REG_RHX)
+        return REGISTER_NAMES[reg];
+
+    return "UNKNOWN_REGISTER";
+}
+
+register_code get_register_by_name(const char *name)
+{
+    if (name == NULL)
+        return REG_INVALID;
+
+    for (int index = 0; index < NUMBER_OF_REGISTERS; index++)
+    {
+        if (strcmp(name, REGISTER_NAMES[index]) == 0)
+            return (register_code)index;
+    }
+
+    return REG_INVALID;
+}

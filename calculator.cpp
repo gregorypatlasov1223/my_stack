@@ -113,6 +113,10 @@ stack_err_t calc_online(stack_t *stack)
                 fprintf(stderr, "POPR command not supported in calculator mode\n");
                 break;
 
+            // case code_JMP:
+            //     fprintf(stderr, "JMP command not supported in calculator mode\n");
+            //     break;
+
             case code_OUT:
                 if (print_calculated_value(stack, output_file) != NO_ERROR)
                     fprintf(stderr, "Print failed\n");

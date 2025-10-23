@@ -24,6 +24,12 @@ void proc_error_translator(processor_error_type error);
 void processor_destructor(processor *processor_pointer);
 void processor_dump(processor* proc, processor_error_type code_error, const char* message);
 
-size_t get_size_of_binary_file(FILE *file);
+
+processor_error_type processor_JB  (processor* processor_pointer, int argument);
+processor_error_type processor_JBE (processor* processor_pointer, int argument);
+processor_error_type processor_JA  (processor* processor_pointer, int argument);
+processor_error_type processor_JAE (processor* processor_pointer, int argument);
+processor_error_type processor_JE  (processor* processor_pointer, int argument);
+processor_error_type processor_JNE (processor* processor_pointer, int argument);
 
 #endif // PROCESSOR_H_

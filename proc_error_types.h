@@ -10,6 +10,7 @@ enum processor_error_type
     PROC_ERROR_UNKNOWN_OPERATION_CODE  = 4,
     PROC_ERROR_STACK_OPERATION_FAILED  = 5,
     PROC_ERROR_INVALID_STATE           = 6,
+    PROC_ERROR_INVALID_JUMP            = 7
 };
 
 #endif // PROC_ERROR_TYPES_H_

@@ -2,6 +2,7 @@
 #define ASSEMBLER_H_
 
 #include "calculator.h"
+#include "common.h"
 #include "asm_error_types.h"
 
 struct assembler
