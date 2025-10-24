@@ -32,4 +32,8 @@ processor_error_type processor_JAE (processor* processor_pointer, int argument);
 processor_error_type processor_JE  (processor* processor_pointer, int argument);
 processor_error_type processor_JNE (processor* processor_pointer, int argument);
 
+processor_error_type execute_math_operation_command(processor* processor_pointer, code_type operarion_code);
+processor_error_type execute_command_with_stack    (processor* processor_pointer, code_type operarion_code, int argument);
+processor_error_type execute_jump_command          (processor* processor_pointer, code_type operarion_code, int argument);
+
 #endif // PROCESSOR_H_

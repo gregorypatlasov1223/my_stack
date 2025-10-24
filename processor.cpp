@@ -83,154 +83,28 @@ processor_error_type execute_processor(processor *processor_pointer)
         switch(operation_code)
         {
             case code_PUSH:
-                stack_error = stack_push(&processor_pointer -> stack, argument);
-                processor_pointer -> instruction_counter += 2;
-                break;
-
             case code_POP:
-            {
-                type_of_element popped_value = 0;
-                stack_error = stack_pop(&processor_pointer -> stack, &popped_value);
-                processor_pointer -> instruction_counter += 1;
-                break;
-            }
-
             case code_PUSHR:
-                if (argument >= REG_RAX && argument <= REG_RHX)
-                {
-                    reg = (register_code)argument;
-                    int register_value = processor_pointer -> registers[reg];
-                    stack_error = stack_push(&processor_pointer -> stack, register_value);
-                }
-                else
-                    return PROC_ERROR_INVALID_STATE;
-                processor_pointer -> instruction_counter += 2;
-                break;
-
             case code_POPR:
-                if (argument >= REG_RAX && argument <= REG_RHX)
-                {
-                    type_of_element popped_value = 0;
-                    stack_error = stack_pop(&processor_pointer -> stack, &popped_value);
-                    if (stack_error == NO_ERROR)
-                    {
-                        reg = (register_code)argument;
-                        processor_pointer -> registers[reg] = popped_value;
-                    }
-                }
-                else
-                    return PROC_ERROR_INVALID_STATE;
-                processor_pointer -> instruction_counter += 2;
+                proc_error = execute_command_with_stack(processor_pointer, operation_code, argument);
                 break;
 
             case code_ADD:
-                stack_error = stack_add(&processor_pointer -> stack);
-                processor_pointer -> instruction_counter += 1;
-                break;
-
             case code_SUB:
-                stack_error = stack_sub(&processor_pointer -> stack);
-                processor_pointer -> instruction_counter += 1;
-                break;
-
             case code_MUL:
-                stack_error = stack_mul(&processor_pointer -> stack);
-                processor_pointer -> instruction_counter += 1;
-                break;
-
             case code_DIV:
-                stack_error = stack_div(&processor_pointer -> stack);
-                processor_pointer -> instruction_counter += 1;
-                break;
-
             case code_SQRT:
-                stack_error = stack_sqrt(&processor_pointer -> stack);
-                processor_pointer -> instruction_counter += 1;
+                proc_error = execute_math_operation_command(processor_pointer, operation_code);
                 break;
 
             case code_JMP:
-                if (argument < 0 || argument >= (int)processor_pointer -> code_buffer_size)
-                    return PROC_ERROR_INVALID_JUMP;
-
-                processor_pointer -> instruction_counter = argument;
-                break;
-
             case code_JB:
-                if (processor_pointer -> stack.size < 2)
-                    return PROC_ERROR_STACK_OPERATION_FAILED;
-
-                proc_error = processor_JB(processor_pointer, argument);
-
-                if (proc_error != PROC_ERROR_NO)
-                    return proc_error;
-
-                if (processor_pointer -> instruction_counter == current_instruction_counter)
-                    processor_pointer -> instruction_counter += 2;
-                break;
-
             case code_JBE:
-                if (processor_pointer -> stack.size < 2)
-                    return PROC_ERROR_STACK_OPERATION_FAILED;
-
-                proc_error = processor_JBE(processor_pointer, argument);
-
-                if (proc_error != PROC_ERROR_NO)
-                    return proc_error;
-
-                if (processor_pointer -> instruction_counter == current_instruction_counter)
-                    processor_pointer -> instruction_counter += 2;
-                break;
-
             case code_JA:
-                if (processor_pointer -> stack.size < 2)
-                    return PROC_ERROR_STACK_OPERATION_FAILED;
-
-                proc_error = processor_JA(processor_pointer, argument);
-
-                if (proc_error != PROC_ERROR_NO)
-                    return proc_error;
-
-                if (processor_pointer -> instruction_counter == current_instruction_counter)
-                    processor_pointer -> instruction_counter += 2;
-                break;
-
             case code_JAE:
-                if (processor_pointer -> stack.size < 2)
-                    return PROC_ERROR_STACK_OPERATION_FAILED;
-
-                proc_error = processor_JAE(processor_pointer, argument);
-
-                if (proc_error != PROC_ERROR_NO)
-                    return proc_error;
-
-                if (processor_pointer -> instruction_counter == current_instruction_counter)
-                    processor_pointer -> instruction_counter += 2;
-                break;
-
             case code_JE:
-                if (processor_pointer -> stack.size < 2)
-                    return PROC_ERROR_STACK_OPERATION_FAILED;
-
-                proc_error = processor_JE(processor_pointer, argument);
-
-                if (proc_error != PROC_ERROR_NO)
-                    return proc_error;
-
-                if (processor_pointer -> instruction_counter == current_instruction_counter)
-                    processor_pointer -> instruction_counter += 2;
-                break;
-
             case code_JNE:
-                if (processor_pointer -> stack.size < 2)
-                    return PROC_ERROR_STACK_OPERATION_FAILED;
-
-                proc_error = processor_JNE(processor_pointer, argument);
-
-                if (proc_error != PROC_ERROR_NO)
-                    return proc_error;
-
-                if (processor_pointer -> instruction_counter == current_instruction_counter)
-                    processor_pointer -> instruction_counter += 2;
+                proc_error = execute_jump_command(processor_pointer, operation_code, argument);
                 break;
 
             case code_IN:
@@ -514,5 +388,211 @@ processor_error_type processor_JNE(processor* processor_pointer, int argument)
         processor_pointer -> instruction_counter = argument;
     }
     return PROC_ERROR_NO;
+}
+
+
+processor_error_type execute_math_operation_command(processor* processor_pointer, code_type operation_code)
+{
+    assert(processor_pointer != NULL);
+
+    stack_err_t stack_error = NO_ERROR;
+
+    switch(operation_code)
+    {
+        case code_ADD:
+            stack_error = stack_add(&processor_pointer -> stack);
+            break;
+
+        case code_SUB:
+            stack_error = stack_sub(&processor_pointer -> stack);
+            break;
+
+        case code_MUL:
+            stack_error = stack_mul(&processor_pointer -> stack);
+            break;
+
+        case code_DIV:
+            stack_error = stack_div(&processor_pointer -> stack);
+            break;
+
+        case code_SQRT:
+            stack_error = stack_sqrt(&processor_pointer -> stack);
+            break;
+
+        default:
+            return PROC_ERROR_UNKNOWN_OPERATION_CODE;
+    }
+
+    processor_pointer -> instruction_counter += 1;
+
+    if (stack_error == NO_ERROR)
+        return PROC_ERROR_NO;
+
+    return PROC_ERROR_STACK_OPERATION_FAILED;
+}
+
+
+processor_error_type execute_command_with_stack(processor* processor_pointer, code_type operation_code, int argument)
+{
+    assert(processor_pointer != NULL);
+
+    stack_err_t stack_error = NO_ERROR;
+    register_code reg = REG_INVALID;
+
+    switch(operation_code)
+    {
+        case code_PUSH:
+            stack_error = stack_push(&processor_pointer -> stack, argument);
+            processor_pointer -> instruction_counter += 2;
+            break;
+
+        case code_POP:
+        {
+            type_of_element popped_value = 0;
+            stack_error = stack_pop(&processor_pointer -> stack, &popped_value);
+            processor_pointer -> instruction_counter += 1;
+            break;
+        }
+
+        case code_PUSHR:
+            if (argument >= REG_RAX && argument <= REG_RHX)
+            {
+                reg = (register_code)argument;
+                int register_value = processor_pointer -> registers[reg];
+                stack_error = stack_push(&processor_pointer -> stack, register_value);
+            }
+            else
+                return PROC_ERROR_INVALID_STATE;
+
+            processor_pointer -> instruction_counter += 2;
+            break;
+
+        case code_POPR:
+            if (argument >= REG_RAX && argument <= REG_RHX)
+            {
+                type_of_element popped_value = 0;
+                stack_error = stack_pop(&processor_pointer -> stack, &popped_value);
+                if (stack_error == NO_ERROR)
+                {
+                    reg = (register_code)argument;
+                    processor_pointer -> registers[reg] = popped_value;
+                }
+            }
+            else
+                return PROC_ERROR_INVALID_STATE;
+                
+            processor_pointer -> instruction_counter += 2;
+            break;
+
+        default:
+            return PROC_ERROR_UNKNOWN_OPERATION_CODE;
+    }
+
+    if (stack_error == NO_ERROR)
+        return PROC_ERROR_NO;
+
+    return PROC_ERROR_STACK_OPERATION_FAILED;
+}
+
+
+processor_error_type execute_jump_command(processor* processor_pointer, code_type operation_code, int argument)
+{
+    assert(processor_pointer != NULL);
+
+    processor_error_type proc_error = PROC_ERROR_NO;
+    int current_instruction_counter = processor_pointer -> instruction_counter;
+
+    switch(operation_code)
+    {
+        case code_JMP:
+            if (argument < 0 || argument >= (int)processor_pointer -> code_buffer_size)
+                return PROC_ERROR_INVALID_JUMP;
+
+            processor_pointer -> instruction_counter = argument;
+            break;
+
+        case code_JB:
+            if (processor_pointer -> stack.size < 2)
+                return PROC_ERROR_STACK_OPERATION_FAILED;
+
+            proc_error = processor_JB(processor_pointer, argument);
+
+            if (proc_error != PROC_ERROR_NO)
+                return proc_error;
+
+            if (processor_pointer -> instruction_counter == current_instruction_counter)
+                processor_pointer -> instruction_counter += 2;
+            break;
+
+        case code_JBE:
+            if (processor_pointer -> stack.size < 2)
+                return PROC_ERROR_STACK_OPERATION_FAILED;
+
+            proc_error = processor_JBE(processor_pointer, argument);
+
+            if (proc_error != PROC_ERROR_NO)
+                return proc_error;
+
+            if (processor_pointer -> instruction_counter == current_instruction_counter)
+                processor_pointer -> instruction_counter += 2;
+            break;
+
+        case code_JA:
+            if (processor_pointer -> stack.size < 2)
+                return PROC_ERROR_STACK_OPERATION_FAILED;
+
+            proc_error = processor_JA(processor_pointer, argument);
+
+            if (proc_error != PROC_ERROR_NO)
+                return proc_error;
+
+            if (processor_pointer -> instruction_counter == current_instruction_counter)
+                processor_pointer -> instruction_counter += 2;
+            break;
+
+        case code_JAE:
+            if (processor_pointer -> stack.size < 2)
+                return PROC_ERROR_STACK_OPERATION_FAILED;
+
+            proc_error = processor_JAE(processor_pointer, argument);
+
+            if (proc_error != PROC_ERROR_NO)
+                return proc_error;
+
+            if (processor_pointer -> instruction_counter == current_instruction_counter)
+                processor_pointer -> instruction_counter += 2;
+            break;
+
+        case code_JE:
+            if (processor_pointer -> stack.size < 2)
+                return PROC_ERROR_STACK_OPERATION_FAILED;
+
+            proc_error = processor_JE(processor_pointer, argument);
+
+            if (proc_error != PROC_ERROR_NO)
+                return proc_error;
+
+            if (processor_pointer -> instruction_counter == current_instruction_counter)
+                processor_pointer -> instruction_counter += 2;
+            break;
+
+        case code_JNE:
+            if (processor_pointer -> stack.size < 2)
+                return PROC_ERROR_STACK_OPERATION_FAILED;
+
+            proc_error = processor_JNE(processor_pointer, argument);
+
+            if (proc_error != PROC_ERROR_NO)
+                return proc_error;
+
+            if (processor_pointer -> instruction_counter == current_instruction_counter)
+                processor_pointer -> instruction_counter += 2;
+            break;
+
+        default:
+            return PROC_ERROR_UNKNOWN_OPERATION_CODE;
+    }
+
+    return proc_error;
 }
 
