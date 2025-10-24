@@ -16,6 +16,7 @@ enum assembler_type_error
     ASM_ERROR_INVALID_REGISTER           = 10,
     ASM_ERROR_LABEL_TABLE                = 11,
     ASM_ERROR_REDEFINITION_LABEL         = 12,
+    ASM_ERROR_UNDEFINED_LABEL            = 13
 };
 
 #endif // ASM_ERROR_TYPES_H_

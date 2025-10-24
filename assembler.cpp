@@ -11,7 +11,27 @@
 #include "colour_codes.h"
 #include "asm_error_types.h"
 
-const int MAX_SIZE_OF_REGISTERS = 32;
+int command_requires_argument(code_type operation)
+{
+    switch (operation)
+    {
+        case code_PUSH:
+        case code_POPR:
+        case code_PUSHR:
+        case code_JMP:
+        case code_JB:
+        case code_JBE:
+        case code_JA:
+        case code_JAE:
+        case code_JE:
+        case code_JNE:
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
 
 code_type get_operation_code(const char* name_of_command)
 {
@@ -71,6 +91,9 @@ code_type get_operation_code(const char* name_of_command)
     if (strcmp(name_of_command, "OUT") == 0)
         return code_OUT;
 
+    if (strcmp(name_of_command, "IN") == 0)
+        return code_IN;
+
     fprintf(stderr, "Error: Unknown command '%s'\n", name_of_command);
     return code_SHIT;
 }
@@ -93,16 +116,14 @@ assembler_type_error read_from_instruction_file_to_buffer(assembler *assembler_p
     if (size_of_file == 0)
     {
         fclose(instruction_file);
-
         return ASM_READING_FILE_ERROR;
     }
 
-    assembler_pointer -> instruction_buffer = (char*)calloc(size_of_file + 1, sizeof(char)); // +1 для '\0'
+    assembler_pointer -> instruction_buffer = (char*)calloc(size_of_file + 1, sizeof(char));
 
     if (assembler_pointer -> instruction_buffer == NULL)
     {
         fclose(instruction_file);
-
         return ASM_ALLOCATION_FAILED_ERROR;
     }
 
@@ -112,7 +133,6 @@ assembler_type_error read_from_instruction_file_to_buffer(assembler *assembler_p
         fclose(instruction_file);
         free(assembler_pointer -> instruction_buffer);
         assembler_pointer -> instruction_buffer = NULL;
-
         return ASM_READING_FILE_ERROR;
     }
 
@@ -123,111 +143,250 @@ assembler_type_error read_from_instruction_file_to_buffer(assembler *assembler_p
 }
 
 
-assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
+assembler_type_error first_pass(assembler *assembler_pointer)
 {
-    assert(assembler_pointer                       != NULL);
+    assert(assembler_pointer != NULL);
     assert(assembler_pointer -> instruction_buffer != NULL);
-    assert(assembler_pointer -> binary_filename    != NULL);
 
-    FILE *binary_file = fopen(assembler_pointer -> binary_filename, "wb");
+    char token[MAX_COMMAND_LENGTH] = {};
+    int current_address = 0;
+    char* buffer_ptr = assembler_pointer -> instruction_buffer;
+
+    while (sscanf(buffer_ptr, "%31s", token) == 1)
+    {
+        buffer_ptr += strlen(token);
+        while (isspace(*buffer_ptr))
+            buffer_ptr++;
+
+        if (token[0] == label_id_symbol)
+        {
+            assembler_type_error error = add_label(&assembler_pointer -> list_of_labels, token + 1, current_address);
+            if (error != ASM_NO_ERROR)
+            {
+                fprintf(stderr, "Error: Label table full or duplicate label '%s'\n", token);
+                return error;
+            }
+            continue; // не увеличиваем адрес для меток
+        }
+
+        code_type operation_code = get_operation_code(token);
+
+        if (operation_code == code_SHIT)
+        {
+            register_code reg = get_register_by_name(token);
+            if (reg == REG_INVALID)
+                return ASM_UNKNOWN_COMMAND_ERROR;
+            continue;
+        }
+
+        if (command_requires_argument(operation_code))
+            current_address += 2;
+        else
+            current_address += 1;
+
+        if (command_requires_argument(operation_code))
+        {
+            char next_token[MAX_COMMAND_LENGTH] = {};
+            if (sscanf(buffer_ptr, "%31s", next_token) == 1)
+            {
+                buffer_ptr += strlen(next_token);
+                while (isspace(*buffer_ptr))
+                    buffer_ptr++;
+            }
+        }
+    }
+
+    printf("First pass completed. Code size: %d\n", current_address);
+    return ASM_NO_ERROR;
+}
+
+
+assembler_type_error second_pass(assembler *assembler_pointer)
+{
+    assert(assembler_pointer                     != NULL);
+    assert(assembler_pointer->instruction_buffer != NULL);
+
+    FILE *binary_file = fopen(assembler_pointer->binary_filename, "wb");
     if (binary_file == NULL)
     {
         fprintf(stderr, "Error: Cannot open binary file for writing\n");
         return ASM_CANNOT_OPEN_OUTPUT_FILE_ERROR;
     }
 
-    char *buffer_ptr = assembler_pointer -> instruction_buffer;
-    char name_of_command[50] = {};
-    size_t number_of_commands = 0;
-    int bytes_read = 0;
+    char token[MAX_COMMAND_LENGTH] = {};
+    int argument = 0;
+    int commands_processed = 0;
+    char* buffer_ptr = assembler_pointer -> instruction_buffer;
 
-    while (sscanf(buffer_ptr, "%49s%n", name_of_command, &bytes_read) == 1)
+    size_t buffer_size = strlen(assembler_pointer -> instruction_buffer) * 2; // грубая оценка
+    int* binary_buffer = (int*)calloc(buffer_size, sizeof(int));
+    if (binary_buffer == NULL)
     {
-        buffer_ptr += bytes_read;
+        fclose(binary_file);
+        return ASM_ALLOCATION_FAILED_ERROR;
+    }
 
-        printf("Processing command: '%s'\n", name_of_command);
+    size_t binary_index = 0;
 
-        code_type code_of_command = get_operation_code(name_of_command);
+    while (sscanf(buffer_ptr, "%31s", token) == 1)
+    {
+        buffer_ptr += strlen(token);
+        while (isspace(*buffer_ptr))
+            buffer_ptr++;
 
-        if (code_of_command == code_SHIT)
+        // Пропускаем метки
+        if (token[0] == label_id_symbol)
+            continue;
+
+        code_type operation_code = get_operation_code(token);
+        if (operation_code == code_SHIT)
         {
-            fprintf(stderr, "Unknown command: '%s'\n", name_of_command);
+            free(binary_buffer);
             fclose(binary_file);
             return ASM_UNKNOWN_COMMAND_ERROR;
         }
 
-        fwrite(&code_of_command, sizeof(code_type), 1, binary_file);
-
-        if (code_of_command == code_PUSH || code_of_command == code_POP)
+        switch(operation_code)
         {
-            type_of_element number_arg = 0;
-            if (sscanf(buffer_ptr, "%d%n", &number_arg, &bytes_read) == 1)
-            {
-                fwrite(&number_arg, sizeof(type_of_element), 1, binary_file);
-                buffer_ptr += bytes_read;
-            }
+            case code_PUSH:
+                binary_buffer[binary_index++] = operation_code;
+                if (sscanf(buffer_ptr, "%d", &argument) == 1)
+                {
+                    binary_buffer[binary_index++] = argument;
 
-            else
-            {
-                fprintf(stderr, "Expected number argument for command: %s\n", name_of_command);
+                    char arg_buffer[32] = {};
+                    sprintf(arg_buffer, "%d", argument);
+                    buffer_ptr += strlen(arg_buffer);
+                    while (isspace(*buffer_ptr))
+                        buffer_ptr++;
+                }
+                else
+                {
+                    free(binary_buffer);
+                    fclose(binary_file);
+                    return ASM_INVALID_ARGUMENT_ERROR;
+                }
+                break;
+
+            case code_JMP:
+            case code_JB:
+            case code_JBE:
+            case code_JA:
+            case code_JAE:
+            case code_JE:
+            case code_JNE:
+                binary_buffer[binary_index++] = operation_code;
+                {
+                    char label_name[MAX_LABEL_LENGTH] = {};
+                    if (sscanf(buffer_ptr, "%31s", label_name) == 1)
+                    {
+                        int label_address = find_label(&assembler_pointer -> list_of_labels, label_name);
+                        if (label_address == -1)
+                        {
+                            free(binary_buffer);
+                            fclose(binary_file);
+                            return ASM_ERROR_UNDEFINED_LABEL;
+                        }
+
+                        binary_buffer[binary_index++] = label_address;
+                        buffer_ptr += strlen(label_name);
+                        while (isspace(*buffer_ptr))
+                            buffer_ptr++;
+                    }
+                    else
+                    {
+                        free(binary_buffer);
+                        fclose(binary_file);
+                        return ASM_INVALID_ARGUMENT_ERROR;
+                    }
+                }
+                break;
+
+            case code_POPR:
+            case code_PUSHR:
+                binary_buffer[binary_index++] = operation_code;
+                {
+                    char register_name[MAX_COMMAND_LENGTH] = {};
+                    if (sscanf(buffer_ptr, "%31s", register_name) == 1)
+                    {
+                        register_code reg = get_register_by_name(register_name);
+                        if (reg == REG_INVALID)
+                        {
+                            free(binary_buffer);
+                            fclose(binary_file);
+                            return ASM_ERROR_INVALID_REGISTER;
+                        }
+
+                        binary_buffer[binary_index++] = (int)reg;
+                        buffer_ptr += strlen(register_name);
+                        while (isspace(*buffer_ptr))
+                            buffer_ptr++;
+                    }
+                    else
+                    {
+                        free(binary_buffer);
+                        fclose(binary_file);
+                        return ASM_ERROR_EXPECTED_REGISTER;
+                    }
+                }
+                break;
+
+            case code_ADD:
+            case code_SUB:
+            case code_MUL:
+            case code_DIV:
+            case code_SQRT:
+            case code_OUT:
+            case code_IN:
+            case code_POP:
+            case code_HLT:
+                binary_buffer[binary_index++] = operation_code;
+                break;
+
+            case code_SHIT:
+            default:
+                free(binary_buffer);
                 fclose(binary_file);
-                return ASM_INVALID_ARGUMENT_ERROR;
-            }
+                return ASM_UNKNOWN_COMMAND_ERROR;
         }
 
-        else if (code_of_command == code_PUSHR || code_of_command == code_POPR)
-        {
-            char register_name[MAX_SIZE_OF_REGISTERS] = {};
-            if (sscanf(buffer_ptr, "%31s%n", register_name, &bytes_read) != 1)
-            {
-                fprintf(stderr, "Expected register for command: %s\n", name_of_command);
-                fclose(binary_file);
-                return ASM_ERROR_EXPECTED_REGISTER;
-            }
-
-            register_code reg = get_register_by_name(register_name);
-            if (reg == REG_INVALID)
-            {
-                fprintf(stderr, "Invalid register: %s\n", register_name);
-                fclose(binary_file);
-                return ASM_ERROR_INVALID_REGISTER;
-            }
-
-            fwrite(&reg, sizeof(register_code), 1, binary_file);
-            buffer_ptr += bytes_read;
-        }
-
-        else if (code_of_command >= code_JMP && code_of_command <= code_JNE)
-        {
-            int jump_address = 0;
-
-            if (sscanf(buffer_ptr, "%d%n", &jump_address, &bytes_read) == 1)
-            {
-                fwrite(&jump_address, sizeof(int), 1, binary_file);
-                buffer_ptr += bytes_read;
-            }
-
-            else
-            {
-                fprintf(stderr, "Expected jump address for command: %s\n", name_of_command);
-                fclose(binary_file);
-                return ASM_INVALID_ARGUMENT_ERROR;
-            }
-        }
-
-        number_of_commands++;
-
-        while (*buffer_ptr == ' ' || *buffer_ptr == '\t' || *buffer_ptr == '\n' || *buffer_ptr == '\r')
-            buffer_ptr++;
+        commands_processed++;
+        if (operation_code == code_HLT)
+            break;
     }
 
+    size_t written = fwrite(binary_buffer, sizeof(int), binary_index, binary_file);
+    free(binary_buffer);
     fclose(binary_file);
-    printf("Processed %zu commands successfully\n", number_of_commands);
 
+    if (written != binary_index)
+    {
+        return ASM_READING_FILE_ERROR;
+    }
+
+    printf("Second pass completed. Processed %d commands\n", commands_processed);
     return ASM_NO_ERROR;
 }
 
 
+assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
+{
+    assert(assembler_pointer                       != NULL);
+    assert(assembler_pointer -> instruction_buffer != NULL);
+    assert(assembler_pointer -> binary_filename    != NULL);
+
+    printf("=== FIRST PASS ===\n");
+    assembler_type_error error = first_pass(assembler_pointer);
+    if (error != ASM_NO_ERROR)
+        return error;
+
+    printf("=== SECOND PASS ===\n");
+    error = second_pass(assembler_pointer);
+    if (error != ASM_NO_ERROR)
+        return error;
+
+    return ASM_NO_ERROR;
+}
 
 
 assembler_type_error assembler_constructor(assembler* assembler_pointer, const char* input_filename, const char* output_filename)
@@ -240,8 +399,9 @@ assembler_type_error assembler_constructor(assembler* assembler_pointer, const c
     assembler_pointer -> instruction_filename = NULL;
     assembler_pointer -> binary_buffer        = NULL;
     assembler_pointer -> binary_filename      = NULL;
+    assembler_pointer -> binary_file          = NULL;
 
-    init_label_table(&assembler_pointer -> label_table);
+    init_label_table(&assembler_pointer -> list_of_labels);
 
     assembler_pointer -> instruction_filename = strdup(input_filename);
     assembler_pointer -> binary_filename      = strdup(output_filename);
@@ -249,7 +409,6 @@ assembler_type_error assembler_constructor(assembler* assembler_pointer, const c
     if (assembler_pointer -> instruction_filename == NULL || assembler_pointer -> binary_filename == NULL)
     {
         assembler_destructor(assembler_pointer);
-
         return ASM_ALLOCATION_FAILED_ERROR;
     }
 
@@ -258,14 +417,6 @@ assembler_type_error assembler_constructor(assembler* assembler_pointer, const c
     {
         assembler_destructor(assembler_pointer);
         return error;
-    }
-
-    size_t max_possible_commands = strlen(assembler_pointer -> instruction_buffer) / 2 + 1; // Выделяем память для бинарного буфера
-    assembler_pointer -> binary_buffer = (int*)calloc(max_possible_commands, sizeof(int));
-    if (assembler_pointer -> binary_buffer == NULL)
-    {
-        assembler_destructor(assembler_pointer);
-        return ASM_ALLOCATION_FAILED_ERROR;
     }
 
     return ASM_NO_ERROR;
@@ -339,6 +490,15 @@ void asm_error_translator(assembler_type_error error)
         case ASM_ERROR_EXPECTED_REGISTER:
             fprintf(stderr, "Error: Get wrong unexpected register\n");
             break;
+        case ASM_ERROR_LABEL_TABLE:
+            fprintf(stderr, "Error: Label table overflow\n");
+            break;
+        case ASM_ERROR_REDEFINITION_LABEL:
+            fprintf(stderr, "Error: Label redefinition\n");
+            break;
+        case ASM_ERROR_UNDEFINED_LABEL:
+            fprintf(stderr, "Error: Undefined label\n");
+            break;
         default:
             fprintf(stderr, "Error: Unknown error code: %d\n", error);
             break;
@@ -375,16 +535,18 @@ void init_label_table(label_table* ptr_table)
     ptr_table -> number_of_labels = 0;
 
     for (int index_of_label = 0; index_of_label < MAX_NUMBER_OF_LABELS; index_of_label++)
+    {
         for (int index_of_char_in_name = 0; index_of_char_in_name < MAX_LABEL_LENGTH; index_of_char_in_name++)
         {
             ptr_table -> labels[index_of_label].name[index_of_char_in_name] = '\0';
-            ptr_table -> labels[index_of_label].address = -1;
         }
+        ptr_table -> labels[index_of_label].address = -1;
+    }
 }
 
 int find_label(label_table* ptr_table, const char* name_of_label)
 {
-    assert(ptr_table != NULL);
+    assert(ptr_table     != NULL);
     assert(name_of_label != NULL);
 
     for (int i = 0; i < ptr_table -> number_of_labels; i++)
@@ -397,19 +559,20 @@ int find_label(label_table* ptr_table, const char* name_of_label)
 
 assembler_type_error add_label(label_table* ptr_table, const char* name_of_label, int address)
 {
-    assert(ptr_table != NULL);
+    assert(ptr_table     != NULL);
     assert(name_of_label != NULL);
 
     if (ptr_table -> number_of_labels >= MAX_NUMBER_OF_LABELS)
         return ASM_ERROR_LABEL_TABLE;
 
-    if (find_label(ptr_table, name_of_label) != -1) // вдруг уже есть такая метка
+    if (find_label(ptr_table, name_of_label) != -1)
         return ASM_ERROR_REDEFINITION_LABEL;
 
-    strncpy(ptr_table -> labels[ptr_table -> number_of_labels].name, name_of_label, MAX_LABEL_LENGTH - 1); // 1 арг - куда копируем
+    strncpy(ptr_table -> labels[ptr_table -> number_of_labels].name, name_of_label, MAX_LABEL_LENGTH - 1);
     ptr_table -> labels[ptr_table -> number_of_labels].name[MAX_LABEL_LENGTH - 1] = '\0';
     ptr_table -> labels[ptr_table -> number_of_labels].address = address;
     ptr_table -> number_of_labels++;
 
-    return ASM_ERROR_NO;
+    printf("Added label: '%s' at address %d\n", name_of_label, address);
+    return ASM_NO_ERROR;
 }

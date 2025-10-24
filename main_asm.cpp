@@ -8,7 +8,8 @@ int main(int argc, char *argv[])
     if (argc != 3)
     {
         fprintf(stderr, "Error: Expected 2 arguments, got %d\n", argc - 1);
-        return ASM_INCORRECT_NUMBER_OF_ARGUMENTS;
+        fprintf(stderr, "Usage: %s\n", argv[0]);
+        return 1;
     }
 
     const char *input_filename = argv[1];
@@ -21,34 +22,38 @@ int main(int argc, char *argv[])
     assembler asm_instance = {};
 
     assembler_type_error error = assembler_constructor(&asm_instance, input_filename, output_filename);
-
     if (error != ASM_NO_ERROR)
     {
         fprintf(stderr, "Failed to initialize assembler\n");
         asm_error_translator(error);
-        return error;
+        return 1;
     }
 
-    printf("instruction_file_to_buffer loaded successfully\n");
+    printf("Instruction file loaded successfully\n");
     printf("File size: %zu bytes\n", strlen(asm_instance.instruction_buffer));
 
-    error = from_buffer_to_binary_file(&asm_instance);
-
+    printf("=== FIRST PASS ===\n");
+    error = first_pass(&asm_instance);
     if (error != ASM_NO_ERROR)
     {
-        fprintf(stderr, "Failed to assemble to binary\n");
+        fprintf(stderr, "First pass failed\n");
         asm_error_translator(error);
         assembler_destructor(&asm_instance);
+        return 1;
+    }
 
-        return error;
+    printf("=== SECOND PASS ===\n");
+    error = second_pass(&asm_instance);
+    if (error != ASM_NO_ERROR)
+    {
+        fprintf(stderr, "Second pass failed\n");
+        asm_error_translator(error);
+        assembler_destructor(&asm_instance);
+        return 1;
     }
 
     assembler_destructor(&asm_instance);
 
     printf("Assembly completed successfully!\n");
-
     return 0;
 }
-
-
-

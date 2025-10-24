@@ -240,7 +240,7 @@ void processor_dump(processor* proc, processor_error_type code_error, const char
 
     printf("Processor [%p] Dump: %s\n", proc, message);
 
-    stack_dump(&(proc -> stack), NO_ERROR, __FILE__, __func__, __LINE__); // тут бы const сделать
+    stack_dump(&(proc -> stack), NO_ERROR, __FILE__, __func__, __LINE__); 
 
     printf("Processor error: ");
     proc_error_translator(code_error);
@@ -480,7 +480,7 @@ processor_error_type execute_command_with_stack(processor* processor_pointer, co
             }
             else
                 return PROC_ERROR_INVALID_STATE;
-                
+
             processor_pointer -> instruction_counter += 2;
             break;
 

@@ -5,6 +5,7 @@
 #include <cstddef>    // для size_t
 
 const int NUMBER_OF_REGISTERS = 8;
+const int MAX_SIZE_OF_REGISTERS = 32;
 
 extern const char *const REGISTER_NAMES[NUMBER_OF_REGISTERS];
 

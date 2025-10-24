@@ -5,9 +5,10 @@
 #include "common.h"
 #include "asm_error_types.h"
 
-const int MAX_LABEL_LENGTH = 32;
+const int MAX_LABEL_LENGTH     = 32;
+const int MAX_COMMAND_LENGTH   = 32;
 const int MAX_NUMBER_OF_LABELS = 100;
-const char label_id_symbol = ':';
+const char label_id_symbol     = ':';
 
 struct label
 {
@@ -45,5 +46,6 @@ assembler_type_error add_label(label_table* table, const char* name, int address
 
 assembler_type_error first_pass(assembler *assembler_pointer);
 assembler_type_error second_pass(assembler *assembler_pointer);
+int command_requires_argument(code_type operation);
 
 #endif // ASSEMBLER_H_
