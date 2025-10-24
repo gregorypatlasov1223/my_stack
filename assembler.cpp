@@ -196,7 +196,7 @@ assembler_type_error from_buffer_to_binary_file(assembler *assembler_pointer)
             fwrite(&reg, sizeof(register_code), 1, binary_file);
             buffer_ptr += bytes_read;
         }
-        
+
         else if (code_of_command >= code_JMP && code_of_command <= code_JNE)
         {
             int jump_address = 0;
@@ -240,6 +240,8 @@ assembler_type_error assembler_constructor(assembler* assembler_pointer, const c
     assembler_pointer -> instruction_filename = NULL;
     assembler_pointer -> binary_buffer        = NULL;
     assembler_pointer -> binary_filename      = NULL;
+
+    init_label_table(&assembler_pointer -> label_table);
 
     assembler_pointer -> instruction_filename = strdup(input_filename);
     assembler_pointer -> binary_filename      = strdup(output_filename);
@@ -363,4 +365,51 @@ register_code get_register_by_name(const char *name)
     }
 
     return REG_INVALID;
+}
+
+
+void init_label_table(label_table* ptr_table)
+{
+    assert(ptr_table != NULL);
+
+    ptr_table -> number_of_labels = 0;
+
+    for (int index_of_label = 0; index_of_label < MAX_NUMBER_OF_LABELS; index_of_label++)
+        for (int index_of_char_in_name = 0; index_of_char_in_name < MAX_LABEL_LENGTH; index_of_char_in_name++)
+        {
+            ptr_table -> labels[index_of_label].name[index_of_char_in_name] = '\0';
+            ptr_table -> labels[index_of_label].address = -1;
+        }
+}
+
+int find_label(label_table* ptr_table, const char* name_of_label)
+{
+    assert(ptr_table != NULL);
+    assert(name_of_label != NULL);
+
+    for (int i = 0; i < ptr_table -> number_of_labels; i++)
+    {
+        if (strcmp(ptr_table -> labels[i].name, name_of_label) == 0)
+            return ptr_table -> labels[i].address;
+    }
+    return -1;
+}
+
+assembler_type_error add_label(label_table* ptr_table, const char* name_of_label, int address)
+{
+    assert(ptr_table != NULL);
+    assert(name_of_label != NULL);
+
+    if (ptr_table -> number_of_labels >= MAX_NUMBER_OF_LABELS)
+        return ASM_ERROR_LABEL_TABLE;
+
+    if (find_label(ptr_table, name_of_label) != -1) // вдруг уже есть такая метка
+        return ASM_ERROR_REDEFINITION_LABEL;
+
+    strncpy(ptr_table -> labels[ptr_table -> number_of_labels].name, name_of_label, MAX_LABEL_LENGTH - 1); // 1 арг - куда копируем
+    ptr_table -> labels[ptr_table -> number_of_labels].name[MAX_LABEL_LENGTH - 1] = '\0';
+    ptr_table -> labels[ptr_table -> number_of_labels].address = address;
+    ptr_table -> number_of_labels++;
+
+    return ASM_ERROR_NO;
 }
