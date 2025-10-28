@@ -70,7 +70,7 @@ processor_error_type execute_processor(processor *processor_pointer)
         int argument = 0;
 
         if (operation_code == code_PUSH || operation_code == code_PUSHR || operation_code == code_POPR ||
-           (operation_code >= code_JMP && operation_code <= code_JNE))
+            operation_code == code_CALL || (operation_code >= code_JMP && operation_code <= code_JNE))
         {
             if (current_instruction_counter + 1 >= (int)processor_pointer -> code_buffer_size)
                 return PROC_ERROR_INVALID_STATE;
@@ -89,29 +89,26 @@ processor_error_type execute_processor(processor *processor_pointer)
 
             case code_CALL:
             {
-                // Сохраняем адрес возврата в стек ВОЗВРАТОВ
-                int return_address = processor_pointer->instruction_counter + 2;
-                stack_err_t call_stack_error = stack_push(&processor_pointer->return_stack, return_address); // переименовал
+                int return_address = processor_pointer -> instruction_counter + 2;
 
+                stack_err_t call_stack_error = stack_push(&processor_pointer -> return_stack, return_address);
                 if (call_stack_error != NO_ERROR)
                     return PROC_ERROR_STACK_OPERATION_FAILED;
 
-                // Переходим по адресу функции
                 processor_pointer->instruction_counter = argument;
                 break;
             }
 
             case code_RET:
             {
-                // Берем адрес возврата из стека ВОЗВРАТОВ
                 type_of_element return_address;
-                stack_err_t ret_stack_error = stack_pop(&processor_pointer->return_stack, &return_address); // переименовал
+
+                stack_err_t ret_stack_error = stack_pop(&processor_pointer->return_stack, &return_address);
 
                 if (ret_stack_error != NO_ERROR)
                     return PROC_ERROR_STACK_OPERATION_FAILED;
 
-                // Возвращаемся по адресу
-                processor_pointer->instruction_counter = return_address;
+                processor_pointer -> instruction_counter = return_address;
                 break;
             }
 
@@ -269,6 +266,9 @@ void processor_dump(processor* proc, processor_error_type code_error, const char
     printf("Processor [%p] Dump: %s\n", proc, message);
 
     stack_dump(&(proc -> stack), NO_ERROR, __FILE__, __func__, __LINE__);
+
+    printf("Return stack:\n");
+    stack_dump(&(proc -> return_stack), NO_ERROR, __FILE__, __func__, __LINE__);
 
     printf("Processor error: ");
     proc_error_translator(code_error);
@@ -477,6 +477,7 @@ processor_error_type execute_command_with_stack(processor* processor_pointer, co
         case code_POP:
         {
             type_of_element popped_value = 0;
+
             stack_error = stack_pop(&processor_pointer -> stack, &popped_value);
             processor_pointer -> instruction_counter += 1;
             break;
@@ -516,10 +517,10 @@ processor_error_type execute_command_with_stack(processor* processor_pointer, co
             return PROC_ERROR_UNKNOWN_OPERATION_CODE;
     }
 
-    if (stack_error == NO_ERROR)
-        return PROC_ERROR_NO;
+    if (stack_error != NO_ERROR)
+        return PROC_ERROR_STACK_OPERATION_FAILED;
 
-    return PROC_ERROR_STACK_OPERATION_FAILED;
+    return PROC_ERROR_NO;
 }
 
 

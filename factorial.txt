@@ -1,10 +1,10 @@
 PUSH 6
+POPR RAX
 CALL :factorial
 OUT
 HLT
 
 :factorial
-POPR RAX
 PUSHR RAX
 PUSH 1
 JE :base_case
@@ -13,6 +13,7 @@ PUSHR RAX
 PUSHR RAX
 PUSH 1
 SUB
+POPR RAX
 CALL :factorial
 
 MUL

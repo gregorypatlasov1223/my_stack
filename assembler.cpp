@@ -127,7 +127,7 @@ assembler_type_error first_pass(assembler *assembler_pointer)
 
         if (token[0] == label_id_symbol)
         {
-            assembler_type_error error = add_label(&assembler_pointer -> list_of_labels, token + 1, current_address);
+            assembler_type_error error = add_label(&assembler_pointer -> list_of_labels, token, current_address);
             if (error != ASM_NO_ERROR)
             {
                 fprintf(stderr, "Error: Label table full or duplicate label '%s'\n", token);
@@ -182,7 +182,7 @@ assembler_type_error first_pass(assembler *assembler_pointer)
     printf("First pass completed. Code size: %d\n", current_address);
 
     printf("Label table:\n");
-    for (int i = 0; i < assembler_pointer->list_of_labels.number_of_labels; i++)
+    for (int i = 0; i < assembler_pointer -> list_of_labels.number_of_labels; i++)
     {
         printf("  %s -> %d\n",
                assembler_pointer -> list_of_labels.labels[i].name,
@@ -272,9 +272,20 @@ assembler_type_error second_pass(assembler *assembler_pointer)
                     char label_name[MAX_LABEL_LENGTH] = {};
                     if (sscanf(buffer_ptr, "%31s", label_name) == 1)
                     {
+                        printf("Looking for jump label: '%s'\n", label_name);
+
                         int label_address = find_label(&assembler_pointer -> list_of_labels, label_name);
+
                         if (label_address == -1)
                         {
+                            printf("Jump label not found in table. Available labels:\n");
+                            for (int i = 0; i < assembler_pointer -> list_of_labels.number_of_labels; i++)
+                            {
+                                printf("  '%s' -> %d\n",
+                                       assembler_pointer -> list_of_labels.labels[i].name,
+                                       assembler_pointer -> list_of_labels.labels[i].address);
+                            }
+
                             free(binary_buffer);
                             fclose(binary_file);
                             return ASM_ERROR_UNDEFINED_LABEL;
@@ -331,20 +342,12 @@ assembler_type_error second_pass(assembler *assembler_pointer)
                     {
                         printf("Looking for label: '%s'\n", label_name);
 
-                        char clean_label_name[MAX_LABEL_LENGTH] = {}; // очистка метки для гибкости
-                        if (label_name[0] == label_id_symbol)
-                            strcpy(clean_label_name, label_name + 1);
+                        int label_address = find_label(&assembler_pointer -> list_of_labels, label_name);
 
-                        else
-                            strcpy(clean_label_name, label_name);
-
-                        printf("Cleaned label: '%s'\n", clean_label_name);
-
-                        int label_address = find_label(&assembler_pointer->list_of_labels, clean_label_name);
                         if (label_address == -1)
                         {
                             printf("Label not found in table. Available labels:\n");
-                            for (int i = 0; i < assembler_pointer->list_of_labels.number_of_labels; i++)
+                            for (int i = 0; i < assembler_pointer -> list_of_labels.number_of_labels; i++)
                             {
                                 printf("  '%s' -> %d\n",
                                        assembler_pointer -> list_of_labels.labels[i].name,
@@ -361,7 +364,6 @@ assembler_type_error second_pass(assembler *assembler_pointer)
                         while (isspace(*buffer_ptr))
                             buffer_ptr++;
                     }
-
                     else
                     {
                         free(binary_buffer);
@@ -395,8 +397,6 @@ assembler_type_error second_pass(assembler *assembler_pointer)
         }
 
         commands_processed++;
-        if (operation_code == code_HLT)
-            break;
     }
 
     size_t written = fwrite(binary_buffer, sizeof(int), binary_index, binary_file);
