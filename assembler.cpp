@@ -25,8 +25,10 @@ int command_requires_argument(code_type operation)
         case code_JAE:
         case code_JE:
         case code_JNE:
+        case code_CALL:
             return 1;
 
+        case code_RET:
         default:
             return 0;
     }
@@ -37,62 +39,27 @@ code_type get_operation_code(const char* name_of_command)
 {
     assert(name_of_command != NULL);
 
-    if (strcmp(name_of_command, "HLT") == 0)
-        return code_HLT;
-
-    if (strcmp(name_of_command, "PUSH") == 0)
-        return code_PUSH;
-
-    if (strcmp(name_of_command, "POP") == 0)
-        return code_POP;
-
-    if (strcmp(name_of_command, "POPR") == 0)
-        return code_POPR;
-
-    if (strcmp(name_of_command, "PUSHR") == 0)
-        return code_PUSHR;
-
-    if (strcmp(name_of_command, "JMP") == 0)
-        return code_JMP;
-
-    if (strcmp(name_of_command, "JB") == 0)
-        return code_JB;
-
-    if (strcmp(name_of_command, "JBE") == 0)
-        return code_JBE;
-
-    if (strcmp(name_of_command, "JA") == 0)
-        return code_JA;
-
-    if (strcmp(name_of_command, "JAE") == 0)
-        return code_JAE;
-
-    if (strcmp(name_of_command, "JE") == 0)
-        return code_JE;
-
-    if (strcmp(name_of_command, "JNE") == 0)
-        return code_JNE;
-
-    if (strcmp(name_of_command, "ADD") == 0)
-        return code_ADD;
-
-    if (strcmp(name_of_command, "SUB") == 0)
-        return code_SUB;
-
-    if (strcmp(name_of_command, "MUL") == 0)
-        return code_MUL;
-
-    if (strcmp(name_of_command, "DIV") == 0)
-        return code_DIV;
-
-    if (strcmp(name_of_command, "SQRT") == 0)
-        return code_SQRT;
-
-    if (strcmp(name_of_command, "OUT") == 0)
-        return code_OUT;
-
-    if (strcmp(name_of_command, "IN") == 0)
-        return code_IN;
+    if (strcmp(name_of_command, "HLT")  == 0)  return code_HLT;
+    if (strcmp(name_of_command, "PUSH") == 0)  return code_PUSH;
+    if (strcmp(name_of_command, "POP")  == 0)  return code_POP;
+    if (strcmp(name_of_command, "POPR") == 0)  return code_POPR;
+    if (strcmp(name_of_command, "PUSHR")== 0)  return code_PUSHR;
+    if (strcmp(name_of_command, "JMP")  == 0)  return code_JMP;
+    if (strcmp(name_of_command, "JB")   == 0)  return code_JB;
+    if (strcmp(name_of_command, "JBE")  == 0)  return code_JBE;
+    if (strcmp(name_of_command, "JA")   == 0)  return code_JA;
+    if (strcmp(name_of_command, "JAE")  == 0)  return code_JAE;
+    if (strcmp(name_of_command, "JE")   == 0)  return code_JE;
+    if (strcmp(name_of_command, "JNE")  == 0)  return code_JNE;
+    if (strcmp(name_of_command, "ADD")  == 0)  return code_ADD;
+    if (strcmp(name_of_command, "SUB")  == 0)  return code_SUB;
+    if (strcmp(name_of_command, "MUL")  == 0)  return code_MUL;
+    if (strcmp(name_of_command, "DIV")  == 0)  return code_DIV;
+    if (strcmp(name_of_command, "SQRT") == 0)  return code_SQRT;
+    if (strcmp(name_of_command, "OUT")  == 0)  return code_OUT;
+    if (strcmp(name_of_command, "IN")   == 0)  return code_IN;
+    if (strcmp(name_of_command, "CALL") == 0)  return code_CALL;
+    if (strcmp(name_of_command, "RET")  == 0)  return code_RET;
 
     fprintf(stderr, "Error: Unknown command '%s'\n", name_of_command);
     return code_SHIT;
@@ -166,7 +133,7 @@ assembler_type_error first_pass(assembler *assembler_pointer)
                 fprintf(stderr, "Error: Label table full or duplicate label '%s'\n", token);
                 return error;
             }
-            continue; // не увеличиваем адрес для меток
+            continue;
         }
 
         code_type operation_code = get_operation_code(token);
@@ -181,6 +148,7 @@ assembler_type_error first_pass(assembler *assembler_pointer)
 
         if (command_requires_argument(operation_code))
             current_address += 2;
+
         else
             current_address += 1;
 
@@ -189,14 +157,38 @@ assembler_type_error first_pass(assembler *assembler_pointer)
             char next_token[MAX_COMMAND_LENGTH] = {};
             if (sscanf(buffer_ptr, "%31s", next_token) == 1)
             {
+                if (operation_code == code_CALL)
+                {
+                    int number;
+                    if (sscanf(next_token, "%d", &number) == 1)
+                    {
+                        fprintf(stderr, "Error: CALL requires label, not number: '%s'\n", next_token);
+                        return ASM_INVALID_ARGUMENT_ERROR;
+                    }
+                }
+
                 buffer_ptr += strlen(next_token);
                 while (isspace(*buffer_ptr))
                     buffer_ptr++;
+            }
+            else
+            {
+                fprintf(stderr, "Error: Expected argument for command '%s'\n", token);
+                return ASM_INVALID_ARGUMENT_ERROR;
             }
         }
     }
 
     printf("First pass completed. Code size: %d\n", current_address);
+
+    printf("Label table:\n");
+    for (int i = 0; i < assembler_pointer->list_of_labels.number_of_labels; i++)
+    {
+        printf("  %s -> %d\n",
+               assembler_pointer -> list_of_labels.labels[i].name,
+               assembler_pointer -> list_of_labels.labels[i].address);
+    }
+
     return ASM_NO_ERROR;
 }
 
@@ -329,6 +321,58 @@ assembler_type_error second_pass(assembler *assembler_pointer)
                         return ASM_ERROR_EXPECTED_REGISTER;
                     }
                 }
+                break;
+
+            case code_CALL:
+                binary_buffer[binary_index++] = operation_code;
+                {
+                    char label_name[MAX_LABEL_LENGTH] = {};
+                    if (sscanf(buffer_ptr, "%31s", label_name) == 1)
+                    {
+                        printf("Looking for label: '%s'\n", label_name);
+
+                        char clean_label_name[MAX_LABEL_LENGTH] = {}; // очистка метки для гибкости
+                        if (label_name[0] == label_id_symbol)
+                            strcpy(clean_label_name, label_name + 1);
+
+                        else
+                            strcpy(clean_label_name, label_name);
+
+                        printf("Cleaned label: '%s'\n", clean_label_name);
+
+                        int label_address = find_label(&assembler_pointer->list_of_labels, clean_label_name);
+                        if (label_address == -1)
+                        {
+                            printf("Label not found in table. Available labels:\n");
+                            for (int i = 0; i < assembler_pointer->list_of_labels.number_of_labels; i++)
+                            {
+                                printf("  '%s' -> %d\n",
+                                       assembler_pointer -> list_of_labels.labels[i].name,
+                                       assembler_pointer -> list_of_labels.labels[i].address);
+                            }
+
+                            free(binary_buffer);
+                            fclose(binary_file);
+                            return ASM_ERROR_UNDEFINED_LABEL;
+                        }
+
+                        binary_buffer[binary_index++] = label_address;
+                        buffer_ptr += strlen(label_name);
+                        while (isspace(*buffer_ptr))
+                            buffer_ptr++;
+                    }
+
+                    else
+                    {
+                        free(binary_buffer);
+                        fclose(binary_file);
+                        return ASM_INVALID_ARGUMENT_ERROR;
+                    }
+                }
+                break;
+
+            case code_RET:
+                binary_buffer[binary_index++] = operation_code;
                 break;
 
             case code_ADD:

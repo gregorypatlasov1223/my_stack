@@ -47,6 +47,8 @@ enum code_type
     code_JE      = 46,
     code_JNE     = 47,
 
+    code_CALL    = 51,
+    code_RET     = 52,
 };
 
 size_t get_file_size(FILE *file);

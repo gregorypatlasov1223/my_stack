@@ -69,8 +69,6 @@ processor_error_type execute_processor(processor *processor_pointer)
         code_type operation_code = (code_type)processor_pointer -> code_buffer[current_instruction_counter];
         int argument = 0;
 
-        register_code reg = REG_INVALID;
-
         if (operation_code == code_PUSH || operation_code == code_PUSHR || operation_code == code_POPR ||
            (operation_code >= code_JMP && operation_code <= code_JNE))
         {
@@ -88,6 +86,34 @@ processor_error_type execute_processor(processor *processor_pointer)
             case code_POPR:
                 proc_error = execute_command_with_stack(processor_pointer, operation_code, argument);
                 break;
+
+            case code_CALL:
+            {
+                // Сохраняем адрес возврата в стек ВОЗВРАТОВ
+                int return_address = processor_pointer->instruction_counter + 2;
+                stack_err_t call_stack_error = stack_push(&processor_pointer->return_stack, return_address); // переименовал
+
+                if (call_stack_error != NO_ERROR)
+                    return PROC_ERROR_STACK_OPERATION_FAILED;
+
+                // Переходим по адресу функции
+                processor_pointer->instruction_counter = argument;
+                break;
+            }
+
+            case code_RET:
+            {
+                // Берем адрес возврата из стека ВОЗВРАТОВ
+                type_of_element return_address;
+                stack_err_t ret_stack_error = stack_pop(&processor_pointer->return_stack, &return_address); // переименовал
+
+                if (ret_stack_error != NO_ERROR)
+                    return PROC_ERROR_STACK_OPERATION_FAILED;
+
+                // Возвращаемся по адресу
+                processor_pointer->instruction_counter = return_address;
+                break;
+            }
 
             case code_ADD:
             case code_SUB:
@@ -194,9 +220,10 @@ processor_error_type processor_constructor(processor* processor_pointer, size_t 
     assert(processor_pointer != NULL);
     assert(starting_capacity > 0);
 
-    stack_err_t stack_constructor_result = stack_constructor(&(processor_pointer -> stack), starting_capacity);
+    stack_err_t data_stack_result   = stack_constructor(&(processor_pointer->stack), starting_capacity);
+    stack_err_t return_stack_result = stack_constructor(&(processor_pointer->return_stack), starting_capacity);
 
-    if (stack_constructor_result != NO_ERROR)
+    if (data_stack_result != NO_ERROR || return_stack_result != NO_ERROR)
         return PROC_ERROR_STACK_OPERATION_FAILED;
 
     for (int i = 0; i < NUMBER_OF_REGISTERS; i++)
@@ -218,6 +245,7 @@ void processor_destructor(processor *processor_pointer)
         free(processor_pointer -> code_buffer);
 
     stack_destructor(&(processor_pointer -> stack));
+    stack_destructor(&(processor_pointer -> return_stack));
 
     for (int i = 0; i < NUMBER_OF_REGISTERS; i++)
         processor_pointer -> registers[i] = 0;
@@ -240,7 +268,7 @@ void processor_dump(processor* proc, processor_error_type code_error, const char
 
     printf("Processor [%p] Dump: %s\n", proc, message);
 
-    stack_dump(&(proc -> stack), NO_ERROR, __FILE__, __func__, __LINE__); 
+    stack_dump(&(proc -> stack), NO_ERROR, __FILE__, __func__, __LINE__);
 
     printf("Processor error: ");
     proc_error_translator(code_error);

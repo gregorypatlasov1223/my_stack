@@ -9,7 +9,8 @@
 
 struct processor
 {
-    stack_t stack;
+    stack_t stack; // для данных
+    stack_t return_stack; // для адресов функций
     int registers[NUMBER_OF_REGISTERS];
     int instruction_counter;
     int *code_buffer;
