@@ -48,6 +48,10 @@ void proc_error_translator(processor_error_type error)
             printf(RED "PROC_ERROR_INVALID_JUMP\n" RESET);
             break;
 
+        case PROC_ERROR_RAM_ACCESS:
+            printf(RED "PROC_ERROR_RAM_ACCESS\n" RESET);
+            break;
+
         default:
             printf(RED "UNKNOWN_ERROR (%d)\n" RESET, error);
             break;
@@ -69,8 +73,7 @@ processor_error_type execute_processor(processor *processor_pointer)
         code_type operation_code = (code_type)processor_pointer -> code_buffer[current_instruction_counter];
         int argument = 0;
 
-        if (operation_code == code_PUSH || operation_code == code_PUSHR || operation_code == code_POPR ||
-            operation_code == code_CALL || (operation_code >= code_JMP && operation_code <= code_JNE))
+        if (command_has_operand(operation_code))
         {
             if (current_instruction_counter + 1 >= (int)processor_pointer -> code_buffer_size)
                 return PROC_ERROR_INVALID_STATE;
@@ -89,26 +92,17 @@ processor_error_type execute_processor(processor *processor_pointer)
 
             case code_CALL:
             {
-                int return_address = processor_pointer -> instruction_counter + 2;
-
-                stack_err_t call_stack_error = stack_push(&processor_pointer -> return_stack, return_address);
-                if (call_stack_error != NO_ERROR)
-                    return PROC_ERROR_STACK_OPERATION_FAILED;
-
-                processor_pointer->instruction_counter = argument;
+                processor_error_type call_error = execute_call_command(processor_pointer, argument);
+                if (call_error != PROC_ERROR_NO)
+                    return call_error;
                 break;
             }
 
             case code_RET:
-            {
-                type_of_element return_address;
-
-                stack_err_t ret_stack_error = stack_pop(&processor_pointer->return_stack, &return_address);
-
-                if (ret_stack_error != NO_ERROR)
-                    return PROC_ERROR_STACK_OPERATION_FAILED;
-
-                processor_pointer -> instruction_counter = return_address;
+             {
+                processor_error_type ret_error = execute_ret_command(processor_pointer);
+                if (ret_error != PROC_ERROR_NO)
+                    return ret_error;
                 break;
             }
 
@@ -131,24 +125,34 @@ processor_error_type execute_processor(processor *processor_pointer)
                 break;
 
             case code_IN:
+             {
+                processor_error_type input_error = execute_input_command(processor_pointer, &stack_error);
+                if (input_error != PROC_ERROR_NO)
+                    return input_error;
+                break;
+            }
+
+            case code_PUSHM:
             {
-                type_of_element value = 0;
-                printf("Enter a number: ");
-                if (scanf("%d", &value) == 1)
-                    stack_error = stack_push(&processor_pointer -> stack, value);
-                else
-                    return PROC_ERROR_INVALID_STATE;
-                processor_pointer -> instruction_counter += 1;
+                processor_error_type pushm_error = execute_pushm_command(processor_pointer, argument, &stack_error);
+                if (pushm_error != PROC_ERROR_NO)
+                    proc_error = pushm_error;
+                break;
+            }
+
+            case code_POPM:
+            {
+                processor_error_type popm_error = execute_popm_command(processor_pointer, argument, &stack_error);
+                if (popm_error != PROC_ERROR_NO)
+                    proc_error = popm_error;
                 break;
             }
 
             case code_OUT:
             {
-                type_of_element value = 0;
-                stack_error = stack_pop(&processor_pointer -> stack, &value);
-                if (stack_error == NO_ERROR)
-                    printf("OUT -> %d\n", value);
-                processor_pointer -> instruction_counter += 1;
+                processor_error_type out_error = execute_out_command(processor_pointer, &stack_error);
+                if (out_error != PROC_ERROR_NO)
+                    proc_error = out_error;
                 break;
             }
 
@@ -226,6 +230,10 @@ processor_error_type processor_constructor(processor* processor_pointer, size_t 
     for (int i = 0; i < NUMBER_OF_REGISTERS; i++)
         processor_pointer -> registers[i] = 0;
 
+    processor_pointer -> ptr_RAM = (type_of_element*)calloc(STARTING_RAM_CAPACITY, sizeof(type_of_element));
+    if (processor_pointer -> ptr_RAM == NULL)
+        return PROC_ERROR_ALLOCATION_FAILED;
+
     processor_pointer -> instruction_counter = 0;
     processor_pointer -> code_buffer_size    = 0;
     processor_pointer -> code_buffer         = NULL;
@@ -240,6 +248,12 @@ void processor_destructor(processor *processor_pointer)
 
     if (processor_pointer -> code_buffer != NULL)
         free(processor_pointer -> code_buffer);
+
+    if (processor_pointer -> ptr_RAM != NULL)
+    {
+        free(processor_pointer -> ptr_RAM);
+        processor_pointer -> ptr_RAM = NULL;
+    }
 
     stack_destructor(&(processor_pointer -> stack));
     stack_destructor(&(processor_pointer -> return_stack));
@@ -623,5 +637,133 @@ processor_error_type execute_jump_command(processor* processor_pointer, code_typ
     }
 
     return proc_error;
+}
+
+
+bool command_has_operand(code_type operation_code)
+{
+    return (operation_code == code_PUSH  ||
+            operation_code == code_PUSHR ||
+            operation_code == code_POPR  ||
+            operation_code == code_PUSHM ||
+            operation_code == code_POPM  ||
+            operation_code == code_CALL  ||
+            (operation_code >= code_JMP && operation_code <= code_JNE));
+}
+
+
+processor_error_type execute_input_command(processor *processor_pointer, stack_err_t *stack_error)
+{
+    assert(processor_pointer != NULL);
+    assert(stack_error       != NULL);
+
+    type_of_element value = 0;
+    printf("Enter a number: ");
+
+    if (scanf("%d", &value) == 1)
+    {
+        *stack_error = stack_push(&processor_pointer -> stack, value);
+        processor_pointer -> instruction_counter += 1;
+        return PROC_ERROR_NO;
+    }
+    else
+    {
+        return PROC_ERROR_INVALID_STATE;
+    }
+}
+
+
+processor_error_type execute_call_command(processor *processor_pointer, int argument)
+{
+    assert(processor_pointer != NULL);
+
+    int return_address = processor_pointer -> instruction_counter + 2;
+
+    stack_err_t call_stack_error = stack_push(&processor_pointer -> return_stack, return_address);
+    if (call_stack_error != NO_ERROR)
+        return PROC_ERROR_STACK_OPERATION_FAILED;
+
+    processor_pointer -> instruction_counter = argument;
+
+    return PROC_ERROR_NO;
+}
+
+
+processor_error_type execute_ret_command(processor *processor_pointer)
+{
+    assert(processor_pointer != NULL);
+
+    type_of_element return_address;
+
+    stack_err_t ret_stack_error = stack_pop(&processor_pointer -> return_stack, &return_address);
+
+    if (ret_stack_error != NO_ERROR)
+        return PROC_ERROR_STACK_OPERATION_FAILED;
+
+    processor_pointer -> instruction_counter = return_address;
+
+    return PROC_ERROR_NO;
+}
+
+
+processor_error_type execute_pushm_command(processor *processor_pointer, int argument, stack_err_t *stack_error)
+{
+    assert(processor_pointer != NULL);
+    assert(stack_error       != NULL);
+
+    if (processor_pointer -> ptr_RAM == NULL)
+        return PROC_ERROR_RAM_ACCESS;
+
+    if (argument < 0 || argument >= STARTING_RAM_CAPACITY)
+        return PROC_ERROR_RAM_ACCESS;
+
+    type_of_element value = processor_pointer -> ptr_RAM[argument];
+
+    *stack_error = stack_push(&processor_pointer -> stack, value);
+
+    processor_pointer -> instruction_counter += 2;
+
+    return PROC_ERROR_NO;
+}
+
+
+processor_error_type execute_popm_command(processor *processor_pointer, int argument, stack_err_t *stack_error)
+{
+    assert(processor_pointer != NULL);
+    assert(stack_error       != NULL);
+
+    if (processor_pointer -> ptr_RAM == NULL)
+        return PROC_ERROR_RAM_ACCESS;
+
+    if (argument < 0 || argument >= STARTING_RAM_CAPACITY)
+        return PROC_ERROR_RAM_ACCESS;
+
+    type_of_element value = 0;
+    *stack_error = stack_pop(&processor_pointer -> stack, &value);
+
+    if (*stack_error == NO_ERROR)
+        processor_pointer -> ptr_RAM[argument] = value;
+
+    processor_pointer -> instruction_counter += 2;
+
+    return PROC_ERROR_NO;
+}
+
+
+processor_error_type execute_out_command(processor *processor_pointer, stack_err_t *stack_error)
+{
+    assert(processor_pointer != NULL);
+    assert(stack_error       != NULL);
+
+    type_of_element value = 0;
+
+    *stack_error = stack_pop(&processor_pointer -> stack, &value);
+
+    if (*stack_error == NO_ERROR)
+        printf("OUT -> %d\n", value);
+
+    processor_pointer -> instruction_counter += 1;
+
+    return PROC_ERROR_NO;
 }
 

@@ -49,6 +49,9 @@ enum code_type
 
     code_CALL    = 51,
     code_RET     = 52,
+
+    code_PUSHM   = 61,
+    code_POPM    = 62
 };
 
 size_t get_file_size(FILE *file);

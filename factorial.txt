@@ -1,4 +1,4 @@
-PUSH 6
+PUSH 4
 POPR RAX
 CALL :factorial
 OUT

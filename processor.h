@@ -7,15 +7,26 @@
 #include "common.h"
 #include "proc_error_types.h"
 
+const int STARTING_RAM_CAPACITY = 100;
+
 struct processor
 {
     stack_t stack; // для данных
     stack_t return_stack; // для адресов функций
-    int registers[NUMBER_OF_REGISTERS];
-    int instruction_counter;
-    int *code_buffer;
-    size_t code_buffer_size;
+    int*    ptr_RAM;
+    int     registers[NUMBER_OF_REGISTERS];
+    int     instruction_counter;
+    int*    code_buffer;
+    size_t  code_buffer_size;
 };
+
+processor_error_type execute_pushm_command(processor *processor_pointer, int argument, stack_err_t *stack_error);
+processor_error_type execute_popm_command(processor *processor_pointer, int argument, stack_err_t *stack_error);
+processor_error_type execute_input_command(processor *processor_pointer, stack_err_t *stack_error);
+processor_error_type execute_out_command(processor *processor_pointer, stack_err_t *stack_error);
+processor_error_type execute_call_command(processor *processor_pointer, int argument);
+processor_error_type execute_ret_command(processor *processor_pointer);
+bool command_has_operand(code_type operation_code);
 
 processor_error_type execute_processor(processor *processor_pointer);
 processor_error_type processor_constructor(processor* processor_pointer, size_t starting_capacity);

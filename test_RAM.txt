@@ -1,0 +1,12 @@
+PUSH 100
+POPM [RAX]
+
+PUSH 200
+POPM [RBX]
+PUSHM [RAX]
+OUT            
+PUSHM [RBX]
+OUT
+
+HLT
+
